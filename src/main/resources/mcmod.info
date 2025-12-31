@@ -1,0 +1,10 @@
+[
+{
+  "modid": "yeontan",
+  "name": "Back To 2020",
+  "description": "Back To 2020 Quality",
+  "version": "${version}",
+  "mcversion": "1.12.2",
+  "authorList": ["bandiyesol"]
+}
+]

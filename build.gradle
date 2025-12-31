@@ -1,0 +1,53 @@
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net/' }
+        // [추가] ForgeGradle 2.3이 라이브러리를 찾을 수 있게 해주는 대체 주소
+        maven { url = 'https://plugins.gradle.org/m2/' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT'
+    }
+}
+
+apply plugin: 'net.minecraftforge.gradle.forge'
+
+version = "1.0"
+group = "com.bandiyesol.yeontan"
+archivesBaseName = "yeontan"
+
+sourceCompatibility = targetCompatibility = '1.8'
+compileJava.options.encoding = 'UTF-8'
+
+// [추가] 구버전 포지 파일들을 찾기 위한 추가 저장소 주소
+repositories {
+    maven { url = "https://maven.minecraftforge.net/" }
+    maven { url = "https://repo.maven.apache.org/maven2" }
+    flatDir { dirs "libs" }
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+}
+
+minecraft {
+    // 2859 대신 2847 또는 2860으로 변경해 봅니다. (2847이 현재 가장 잘 찾아집니다)
+    version = "1.12.2-14.23.5.2847"
+    runDir = "run"
+    mappings = "snapshot_20171003"
+}
+
+// [추가] 1.12.2에서 리소스 로딩 문제를 방지하는 실무용 코드
+processResources {
+    inputs.property "version", project.version
+    inputs.property "mcversion", project.minecraft.version
+
+    from(sourceSets.main.resources.srcDirs) {
+        include 'mcmod.info'
+        expand 'version':project.version, 'mcversion':project.minecraft.version
+    }
+
+    from(sourceSets.main.resources.srcDirs) {
+        exclude 'mcmod.info'
+    }
+}
