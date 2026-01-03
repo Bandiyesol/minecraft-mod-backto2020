@@ -1,169 +1,160 @@
 package com.bandiyesol.yeontan.event;
 
+import com.bandiyesol.yeontan.entity.QuestEntity;
 import com.bandiyesol.yeontan.network.QuestMessage;
 import com.bandiyesol.yeontan.network.QuestPacketHandler;
-import com.bandiyesol.yeontan.quest.Quest;
-import com.bandiyesol.yeontan.quest.QuestEntityManager;
-import com.bandiyesol.yeontan.quest.QuestManager;
-import net.minecraft.entity.Entity;
+import com.bandiyesol.yeontan.entity.Quest;
+import com.bandiyesol.yeontan.entity.QuestManager;
+import com.bandiyesol.yeontan.util.Helper;
+import com.bandiyesol.yeontan.util.QuestHelper;
+import net.minecraft.command.CommandException;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraft.world.WorldServer;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
-import noppes.npcs.entity.EntityCustomNpc;
+import com.example.iadd.comm.ComMoney;
 
 import java.util.*;
 
 public class QuestEventHandler {
 
-    private int tickCounter = 0;
+    private static final Map<String, List<QuestEntity>> teamQuests = new HashMap<>();
+    private static final long LIMIT_TIME = 2 * 60 * 1000;
 
-    private static final Map<UUID, Integer> playerTargetEntity = new HashMap<>();
-    private static final Map<UUID, Quest> playerActiveQuest = new HashMap<>();
-    private static final Map<UUID, Long> playerQuestTimeout = new HashMap<>();
-
-    private static final Set<Integer> busyEntities = new HashSet<>();
-
+    private int tickCounter;
 
 
     @SubscribeEvent
-    public void onWorldTick(TickEvent.WorldTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.world.isRemote) return;
+    public void onServerTick(TickEvent.ServerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
 
         tickCounter++;
         if (tickCounter >= 20) {
             tickCounter = 0;
-            processTimeouts(event.world.getMinecraftServer());
-        }
-    }
 
+            MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+            if (server == null) return;
 
-    // --- 수락/완료 로직 ---
-    @SubscribeEvent
-    public void onInteract(PlayerInteractEvent.EntityInteract event) {
-        if (event.getWorld().isRemote || !(event.getEntityPlayer() instanceof EntityPlayerMP)) return;
+            for (WorldServer world : server.worlds) {
+                List<QuestEntity> questEntities = world.getEntities(QuestEntity.class, entity -> true);
 
-        EntityPlayerMP player = (EntityPlayerMP) event.getEntityPlayer();
-        Entity target = event.getTarget();
-        UUID uuid = player.getUniqueID();
-
-        if (!(target instanceof EntityCustomNpc) || !QuestEntityManager.isAuthorized(target.getUniqueID())) return;
-
-        if (playerTargetEntity.getOrDefault(uuid, -1) == target.getEntityId()) {
-            handleQuestCompletion(player, target);
-            return;
-        }
-
-        handleQuestAssignment(player, target);
-    }
-
-
-    private void processTimeouts(net.minecraft.server.MinecraftServer server) {
-        long now = System.currentTimeMillis();
-
-        for (Map.Entry<UUID, Long> entry : playerQuestTimeout.entrySet()) {
-            if (now > entry.getValue()) {
-                UUID uuid = entry.getKey();
-                int entityId = playerTargetEntity.getOrDefault(uuid, -1);
-                EntityPlayerMP player = server.getPlayerList().getPlayerByUUID(uuid);
-
-                player.sendMessage(new TextComponentString("§6[퀘스트] 제한 시간이 초과되었습니다."));
-                clearQuest(player, entityId);
+                for (QuestEntity npc : questEntities) {
+                    if (!npc.isTemplate() && npc.getCurrentQuest() != null && npc.isExpired()) {
+                        handleQuestExpiration(npc);
+                    }
+                }
             }
         }
     }
 
 
-    // --- [완료 로직] ---
-    private void handleQuestCompletion(EntityPlayerMP player, Entity target) {
-        Quest quest = playerActiveQuest.get(player.getUniqueID());
-        if (quest == null) return;
+    @SubscribeEvent
+    public void onInteract(PlayerInteractEvent.EntityInteract event) throws CommandException {
+        if (event.getWorld().isRemote || !(event.getTarget() instanceof QuestEntity)) return;
 
-        ItemStack heldItem = player.getHeldItemMainhand();
+        EntityPlayerMP player = (EntityPlayerMP) event.getEntityPlayer();
+        QuestEntity target = (QuestEntity) event.getTarget();
+        String teamName = Helper.getPlayerTeamName(player);
 
-        if (heldItem.isEmpty()) {
-            player.sendMessage(new TextComponentString("§c아이템을 들고 우클릭해주세요!"));
+        if (target.isTemplate()) {
+            player.sendMessage(new TextComponentString("§c[BT2020] §fQuestNPC 원본입니다."));
             return;
         }
 
-        String heldItemName = Objects.requireNonNull(heldItem.getItem().getRegistryName()).toString();
+        if (teamName == null) {
+            player.sendMessage(new TextComponentString("§c[BT2020] §f팀에 소속되어 있어야 합니다."));
+            return;
+        }
 
-        if (heldItemName.equals(quest.getItemName())) {
-            heldItem.shrink(1);
-            giveReward(player, quest);
-            player.sendMessage(new TextComponentString("§a[퀘스트] '" + quest.getQuestTitle() + "' 완료!"));
-            clearQuest(player, target.getEntityId());
+        Quest quest = target.getCurrentQuest();
+        if (quest == null) {
+            handleQuestAssignment(player, target, teamName);
         }
 
         else {
-            player.sendMessage(new TextComponentString("§c잘못된 아이템입니다! §7(요구: " + quest.getItemName() + ")"));
+            if (target.getOwnerTeam().equals(teamName)) {
+                handleQuestCompletion(player, target, teamName, quest);            }
+
+            else {
+                player.sendMessage(new TextComponentString("§c[BT2020] §f다른 팀이 이미 수행 중인 NPC입니다."));
+            }
         }
     }
 
-
-    // --- [수락 로직] ---
-    private void handleQuestAssignment(EntityPlayerMP player, Entity target) {
-        UUID uuid = player.getUniqueID();
-        long currentTime = System.currentTimeMillis();
-
-        if (playerActiveQuest.containsKey(uuid)) {
-            player.sendMessage(new TextComponentString("§e이미 진행 중인 퀘스트가 있습니다."));
-            return;
-        }
-
-        if (busyEntities.contains(target.getEntityId())) {
-            player.sendMessage(new TextComponentString("§c이 NPC는 현재 바쁩니다."));
-            return;
-        }
-
-        Quest selectedQuest = QuestManager.getRandomQuest();
-
-        if (selectedQuest != null) {
-            playerActiveQuest.put(uuid, selectedQuest);
-            playerTargetEntity.put(uuid, target.getEntityId());
-            playerQuestTimeout.put(uuid, currentTime + (5 * 60 * 1000));
-            busyEntities.add(target.getEntityId());
+    // --- [퀘스트 수락 로직] ---
+    private void handleQuestAssignment(EntityPlayerMP player, QuestEntity target, String teamName) {
+        Quest quest = QuestManager.getRandomQuest();
+        if (quest != null) {
+            target.assignQuest(quest, teamName, LIMIT_TIME);
+            teamQuests.computeIfAbsent(teamName, key -> new ArrayList<>()).add(target);
 
             QuestPacketHandler.INSTANCE.sendTo(
                     new QuestMessage(
-                        target.getEntityId(),
-                        selectedQuest.getItemName(),
-                        selectedQuest.getQuestTitle(),
-                        true
+                            target.getEntityId(),
+                            quest.getItemName(),
+                            quest.getQuestTitle(),
+                            true
                     ),
                     player
             );
-
-            player.sendMessage(new TextComponentString("§b[퀘스트] " + selectedQuest.getQuestTitle() + " 미션을 시작합니다!"));
         }
     }
 
+    // --- [퀘스트 완료 로직] ---
+    private void handleQuestCompletion(EntityPlayerMP player, QuestEntity target, String teamName, Quest quest) throws CommandException {
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        if (server == null) return;
 
-    private void giveReward(EntityPlayerMP player, Quest quest) {
-        Item rewardItem = Item.getByNameOrId(quest.getRewardItem());
-        if (rewardItem != null) {
-            ItemStack rewardStack = new ItemStack(rewardItem, quest.getRewardAmount());
+        ItemStack heldItem = player.getHeldItemMainhand();
 
-            if (player.inventory.addItemStackToInventory(rewardStack)) {
-                player.dropItem(rewardStack, false);
-            }
+        if (!heldItem.isEmpty() && Objects.requireNonNull(heldItem.getItem().getRegistryName()).toString().equals(quest.getItemName())) {
+            heldItem.shrink(1);
+            ComMoney.giveCoin(player, quest.getRewardAmount());
+            String message = String.format("§a[퀘스트 완료] %s님이 %s를 완료했습니다!", player.getName(), quest.getQuestTitle());
+            Helper.sendToTeam(Objects.requireNonNull(player.world.getMinecraftServer()), teamName, message);
+            QuestPacketHandler.INSTANCE.sendToAll(
+                    new QuestMessage(
+                            target.getEntityId(),
+                            "",
+                            "",
+                            false
+                    )
+            );
+
+            QuestHelper.spawnQuestNpc(target);
+            target.isDead = true;
+            target.world.removeEntity(target);
+            teamQuests.get(teamName).remove(target);
         }
-
     }
 
+    // --- [만료된 퀘스트 엔티티 교체 로직] ---
+    private void handleQuestExpiration(QuestEntity target) {
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        if (server == null) return;
 
-    private void clearQuest(EntityPlayerMP player, int entityId) {
-        UUID playerUuid = player.getUniqueID();
-        playerActiveQuest.remove(playerUuid);
-        playerTargetEntity.remove(playerUuid);
-        playerQuestTimeout.remove(playerUuid);
-
-        if (entityId != -1) {
-            busyEntities.remove(entityId);
-            QuestPacketHandler.INSTANCE.sendTo(new QuestMessage(entityId, "", "", false),  player);
+        String ownerTeam = target.getOwnerTeam();
+        if (!ownerTeam.isEmpty() && teamQuests.containsKey(ownerTeam)) {
+            teamQuests.get(ownerTeam).remove(target);
+            Helper.sendToTeam(server, ownerTeam, "§c[퀘스트 실패] 제한 시간이 초과되어 NPC가 교체되었습니다.");
         }
+
+        QuestPacketHandler.INSTANCE.sendToAll(
+                new QuestMessage(
+                        target.getEntityId(),
+                        "",
+                        "",
+                        false
+                )
+        );
+
+        QuestHelper.spawnQuestNpc(target);
+        target.isDead = true;
+        target.world.removeEntity(target);
     }
 }

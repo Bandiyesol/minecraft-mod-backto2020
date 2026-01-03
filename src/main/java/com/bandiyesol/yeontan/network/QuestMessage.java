@@ -42,15 +42,19 @@ public class QuestMessage implements IMessage {
     public static class Handler implements IMessageHandler<QuestMessage, IMessage> {
         @Override
         public IMessage onMessage(QuestMessage message, MessageContext context) {
-            if (message.isVisible) {
-                QuestRenderHandler.activeQuests.put(message.entityId, message.itemStackName);
-                QuestRenderHandler.activeQuestTitles.put(message.entityId, message.questTitle);
-            }
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getMinecraft();
 
-            else {
-                QuestRenderHandler.activeQuests.remove(message.entityId);
-                QuestRenderHandler.activeQuestTitles.remove(message.entityId);
-            }
+            mc.addScheduledTask(() -> {
+                if (message.isVisible) {
+                    QuestRenderHandler.activeQuests.put(message.entityId, message.itemStackName);
+                    QuestRenderHandler.activeQuestTitles.put(message.entityId, message.questTitle);
+                }
+
+                else {
+                    QuestRenderHandler.activeQuests.remove(message.entityId);
+                    QuestRenderHandler.activeQuestTitles.remove(message.entityId);
+                }
+            });
 
             return null;
         }

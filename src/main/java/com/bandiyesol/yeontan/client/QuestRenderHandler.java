@@ -1,5 +1,6 @@
 package com.bandiyesol.yeontan.client;
 
+import com.bandiyesol.yeontan.entity.QuestEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.GlStateManager;
@@ -10,8 +11,10 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import noppes.npcs.entity.EntityCustomNpc;
 import org.lwjgl.opengl.GL11;
 
 import java.util.HashMap;
@@ -20,6 +23,24 @@ import java.util.Map;
 public class QuestRenderHandler {
     public static Map<Integer, String> activeQuests = new HashMap<>();
     public static Map<Integer, String> activeQuestTitles = new HashMap<>();
+
+
+    @SubscribeEvent
+    public void onRenderTick(RenderWorldLastEvent event) {
+        for (Entity entity : Minecraft.getMinecraft().world.loadedEntityList) {
+            if (entity instanceof EntityCustomNpc) {
+                EntityCustomNpc npc = (EntityCustomNpc) entity;
+                NBTTagCompound nbt = new NBTTagCompound();
+                npc.writeEntityToNBT(nbt);
+
+                if (nbt.hasKey("YeontanData")) {
+                    int state = nbt.getCompoundTag("YeontanData").getInteger("QuestState");
+                    // state 값에 따라 ! 또는 ? 아이콘을 띄움
+                    renderFloatingIcon(npc, state, event.getPartialTicks());
+                }
+            }
+        }
+    }
 
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
@@ -31,7 +52,7 @@ public class QuestRenderHandler {
         for (Map.Entry<Integer, String> entry : activeQuests.entrySet()) {
             Entity entity = player.world.getEntityByID(entry.getKey());
 
-            if (entity != null && player.getDistanceSq(entity) < 1024) {
+            if (entity instanceof QuestEntity && player.getDistanceSq(entity) < 1024) {
                 String title = activeQuestTitles.getOrDefault(entry.getKey(), "퀘스트 진행 중");
                 renderQuestFloatingDisplay(entity, entry.getValue(), title, partialTicks);
             }
