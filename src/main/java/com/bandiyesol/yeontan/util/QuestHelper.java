@@ -1,74 +1,42 @@
 package com.bandiyesol.yeontan.util;
 
-import com.bandiyesol.yeontan.entity.QuestEntity;
-import com.bandiyesol.yeontan.entity.QuestEntityManager;
 import net.minecraft.entity.Entity;
-import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.World;
-import net.minecraft.world.WorldServer;
-import noppes.npcs.entity.EntityCustomNpc;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class QuestHelper {
 
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    public static final String[] CLONE_POOL = {"Bora", "Meirios", "Agamesius"};
     private static final Random RANDOM = new Random();
 
 
-    // --- [퀘스트 엔티티 부여 로직] ---
-    public static void assignQuestToNpc(EntityCustomNpc npc, String questId) {
-        if (npc == null) return;
-
-        // NPC의 NBT에 퀘스트 정보 주입
-        NBTTagCompound nbt = new NBTTagCompound();
-        npc.writeEntityToNBT(nbt);
-
-        NBTTagCompound yeontanData = nbt.getCompoundTag("YeontanData");
-        yeontanData.setString("CurrentQuestID", questId);
-        yeontanData.setInteger("QuestState", 0); // 0: 시작가능, 1: 진행중, 2: 완료가능
-
-        nbt.setTag("YeontanData", yeontanData);
-        npc.readEntityFromNBT(nbt);
-
-        System.out.println(npc.getName() + "에게 퀘스트를 부여했습니다: " + questId);
-    }
-
     // --- [퀘스트 엔티티 스폰 로직] ---
-    public static void spawnQuestNpc(Entity origin) {
-        List<UUID> templates = QuestEntityManager.getTemplateList();
-        if (templates.isEmpty()) return;
+    public static void spawnQuestNpc(Entity entity) {
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        if (server == null) return;
 
-        // 랜덤하게 UUID 하나 선택
-        UUID templateUUID = templates.get(RANDOM.nextInt(templates.size()));
+        // 1. 랜덤하게 클론 선택
+        String selectedClone = CLONE_POOL[RANDOM.nextInt(CLONE_POOL.length)];
 
-        // [변경] 엔티티 객체를 찾지 않고, 저장된 NBT 데이터를 가져옴
-        NBTTagCompound savedNbt = QuestEntityManager.getTemplateNbt(templateUUID);
+        // 2. 소환 위치 설정
+        double x = entity.posX;
+        double y = entity.posY;
+        double z = entity.posZ;
 
-        if (savedNbt != null) {
-            QuestEntity newQuestNpc = new QuestEntity(origin.world);
-
-            // NBT 복제 (원본 보존을 위해 copy 사용)
-            NBTTagCompound nbtCopy = savedNbt.copy();
-
-            // 필수 태그 정리
-            nbtCopy.removeTag("UUIDMost");
-            nbtCopy.removeTag("UUIDLeast");
-            nbtCopy.removeTag("Pos");
-
-            newQuestNpc.readEntityFromNBT(nbtCopy);
-            newQuestNpc.setPosition(origin.posX, origin.posY, origin.posZ);
-            newQuestNpc.setTemplate(false);
-
-            if (!origin.world.isRemote) {
-                boolean success = origin.world.spawnEntity(newQuestNpc);
-                if (success) {
-                    System.out.println("성공: 데이터로부터 QuestEntity 소환 완료!");
-                    newQuestNpc.updateClient();
-                }
-            }
-        } else {
-            System.out.println("실패: 해당 UUID의 NBT 데이터가 저장되어 있지 않습니다.");
-        }
+        // 3. 명령어 구성: /noppes clone spawn <이름> <탭> <좌표>
+        // 좌표 형식을 명확히 하기 위해 String.format 사용
+        scheduler.schedule(() -> {
+            server.addScheduledTask(() -> {
+                String command = String.format("noppes clone spawn %s 0 %s %.2f %.2f %.2f", selectedClone, selectedClone, x, y, z);
+                System.out.println("[QuestLog] Executing Command: " + command);
+                server.getCommandManager().executeCommand(entity, command);
+            });
+        },3, TimeUnit.SECONDS);
     }
 }

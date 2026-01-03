@@ -2,6 +2,7 @@ package com.bandiyesol.yeontan.network;
 
 import com.bandiyesol.yeontan.client.QuestRenderHandler;
 import io.netty.buffer.ByteBuf;
+import net.minecraft.client.Minecraft;
 import net.minecraftforge.fml.common.network.ByteBufUtils;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
@@ -23,6 +24,11 @@ public class QuestMessage implements IMessage {
         this.isVisible = isVisible;
     }
 
+    public int getEntityId() { return entityId; }
+    public String getItemStackName() { return itemStackName; }
+    public String getQuestTitle() { return questTitle; }
+    public boolean isVisible() { return isVisible; }
+
     @Override
     public void fromBytes(ByteBuf buf) {
         this.entityId = buf.readInt();
@@ -42,17 +48,18 @@ public class QuestMessage implements IMessage {
     public static class Handler implements IMessageHandler<QuestMessage, IMessage> {
         @Override
         public IMessage onMessage(QuestMessage message, MessageContext context) {
-            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getMinecraft();
+            Minecraft mc = Minecraft.getMinecraft();
 
             mc.addScheduledTask(() -> {
                 if (message.isVisible) {
-                    QuestRenderHandler.activeQuests.put(message.entityId, message.itemStackName);
-                    QuestRenderHandler.activeQuestTitles.put(message.entityId, message.questTitle);
+                    QuestRenderHandler.activeRenderQuests.put(
+                            message.getEntityId(),
+                            new QuestDisplayData(message.getItemStackName(), message.getQuestTitle())
+                    );
                 }
 
                 else {
-                    QuestRenderHandler.activeQuests.remove(message.entityId);
-                    QuestRenderHandler.activeQuestTitles.remove(message.entityId);
+                    QuestRenderHandler.activeRenderQuests.remove(message.getEntityId());
                 }
             });
 

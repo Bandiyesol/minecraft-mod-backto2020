@@ -10,10 +10,10 @@ import net.minecraft.util.text.TextComponentString;
 public class CommandSetQuestLevel extends CommandBase {
 
     @Override
-    public String getName() { return "questlevel"; }
+    public String getName() { return "quest"; }
 
     @Override
-    public String getUsage(ICommandSender sender) { return "/questlevel <1/2>"; }
+    public String getUsage(ICommandSender sender) { return "/quest <1/2>"; }
 
     @Override
     public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {

@@ -2,7 +2,6 @@ package com.bandiyesol.yeontan;
 
 import com.bandiyesol.yeontan.command.CommandSetQuestLevel;
 import com.bandiyesol.yeontan.proxy.CommonProxy;
-import com.bandiyesol.yeontan.entity.QuestEntityManager;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
 import net.minecraftforge.fml.common.SidedProxy;
@@ -28,10 +27,7 @@ public class Yeontan {
     public static CommonProxy proxy;
 
     @EventHandler
-    public void preInit(FMLPreInitializationEvent event) {
-        proxy.preInit(event);
-        QuestEntityManager.loadData();
-    }
+    public void preInit(FMLPreInitializationEvent event) { proxy.preInit(event); }
 
     @EventHandler
     public void init(FMLInitializationEvent event) { proxy.init(event); }
@@ -42,7 +38,5 @@ public class Yeontan {
     @EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
         event.registerServerCommand(new CommandSetQuestLevel());
-        event.registerServerCommand(new com.bandiyesol.yeontan.command.CommandQuestEntity());
-        event.registerServerCommand(new com.bandiyesol.yeontan.command.CommandSpawnQuestEntity());
     }
 }
