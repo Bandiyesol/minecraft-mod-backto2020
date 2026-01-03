@@ -24,6 +24,9 @@ public class CommandSetQuestLevel extends CommandBase {
     public int getRequiredPermissionLevel() { return 2; }
 
     @Override
+    public boolean checkPermission(@Nonnull MinecraftServer server, ICommandSender sender) { return sender.canUseCommand(this.getRequiredPermissionLevel(), this.getName()); }
+
+    @Override
     public void execute(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender, String[] args) throws CommandException {
         if (args.length < 1) return;
         QuestManager.currentSeverLevel = Integer.parseInt(args[0]);
