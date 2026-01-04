@@ -6,25 +6,50 @@ import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.TextComponentString;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.List;
 
 public class CommandSetQuestLevel extends CommandBase {
 
     @Override
     @MethodsReturnNonnullByDefault
-    public String getName() { return "quest"; }
+    public String getName() { 
+        return "quest"; 
+    }
 
     @Override
     @MethodsReturnNonnullByDefault
-    public String getUsage(@Nonnull ICommandSender sender) { return "/quest <1/2>"; }
+    public String getUsage(@Nonnull ICommandSender sender) { 
+        return "/quest <1/2>"; 
+    }
 
     @Override
-    public int getRequiredPermissionLevel() { return 2; }
+    public List<String> getAliases() {
+        return Collections.emptyList();
+    }
 
     @Override
-    public boolean checkPermission(@Nonnull MinecraftServer server, ICommandSender sender) { return sender.canUseCommand(this.getRequiredPermissionLevel(), this.getName()); }
+    public int getRequiredPermissionLevel() { 
+        return 2; 
+    }
+
+    @Override
+    public boolean checkPermission(@Nonnull MinecraftServer server, ICommandSender sender) { 
+        return sender.canUseCommand(this.getRequiredPermissionLevel(), this.getName()); 
+    }
+
+    @Override
+    public List<String> getTabCompletions(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender, String[] args, @Nullable BlockPos targetPos) {
+        if (args.length == 1) {
+            return getListOfStringsMatchingLastWord(args, "1", "2");
+        }
+        return Collections.emptyList();
+    }
 
     @Override
     public void execute(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender, String[] args) throws CommandException {

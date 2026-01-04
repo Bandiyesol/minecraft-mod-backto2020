@@ -1,14 +1,45 @@
 package com.bandiyesol.yeontan.network;
 
+import com.bandiyesol.yeontan.Yeontan;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import net.minecraftforge.fml.relauncher.Side;
 
 public class QuestPacketHandler {
 
-    public static SimpleNetworkWrapper INSTANCE = NetworkRegistry.INSTANCE.newSimpleChannel("backto2020_quest");
+    private static SimpleNetworkWrapper INSTANCE = null;
+    private static boolean messageRegistered = false;
 
     public static void init() {
-        INSTANCE.registerMessage(QuestMessage.Handler.class, QuestMessage.class, 0, Side.CLIENT);
+        // Initialize network channel immediately
+        ensureInitialized();
+    }
+
+    private static void ensureInitialized() {
+        if (INSTANCE == null) {
+            System.out.println("[Yeontan] Initializing network channel with modid: " + Yeontan.MODID);
+            
+            try {
+                INSTANCE = NetworkRegistry.INSTANCE.newSimpleChannel(Yeontan.MODID);
+                System.out.println("[Yeontan] Network channel created successfully!");
+            } catch (Exception e) {
+                System.err.println("[Yeontan] Failed to create network channel!");
+                e.printStackTrace();
+                throw new RuntimeException("Failed to initialize network channel", e);
+            }
+        }
+
+        // Register message handler only once
+        if (!messageRegistered && INSTANCE != null) {
+            System.out.println("[Yeontan] Registering message handler...");
+            INSTANCE.registerMessage(QuestMessage.Handler.class, QuestMessage.class, 0, Side.CLIENT);
+            messageRegistered = true;
+            System.out.println("[Yeontan] Message handler registered!");
+        }
+    }
+
+    public static SimpleNetworkWrapper getInstance() {
+        ensureInitialized();
+        return INSTANCE;
     }
 }

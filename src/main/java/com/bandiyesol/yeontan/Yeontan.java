@@ -10,7 +10,12 @@ import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
 
-@Mod(modid = Yeontan.MODID, name = Yeontan.NAME, version = Yeontan.VERSION)
+@Mod(
+        modid = Yeontan.MODID,
+        name = Yeontan.NAME,
+        version = Yeontan.VERSION,
+        dependencies = "required-after:forge@[14.23.5.2847,);after:customnpcs;required-after:iadd"
+)
 public class Yeontan {
 
     public static final String MODID = "yeontan";
@@ -27,13 +32,19 @@ public class Yeontan {
     public static CommonProxy proxy;
 
     @EventHandler
-    public void preInit(FMLPreInitializationEvent event) { proxy.preInit(event); }
+    public void preInit(FMLPreInitializationEvent event) {
+        proxy.preInit(event);
+    }
 
     @EventHandler
-    public void init(FMLInitializationEvent event) { proxy.init(event); }
+    public void init(FMLInitializationEvent event) {
+        proxy.init(event);
+    }
 
     @EventHandler
-    public void postInit(FMLPostInitializationEvent event) { proxy.postInit(event); }
+    public void postInit(FMLPostInitializationEvent event) {
+        proxy.postInit(event);
+    }
 
     @EventHandler
     public void serverStarting(FMLServerStartingEvent event) {

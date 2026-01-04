@@ -11,11 +11,13 @@ public class QuestManager {
     private static final Random RANDOM = new Random();
     public static int currentSeverLevel = 1;
 
-    static {
-        ALL_QUESTS.add(new Quest(1, "iadd:f_corn", "사과 가져오기", 1, 1));
-        ALL_QUESTS.add(new Quest(2, "iadd:f_sausage", "배고파요!", 1, 1));
-        ALL_QUESTS.add(new Quest(3, "iadd:f_cream", "귀한 보석", 2, 1));
-        ALL_QUESTS.add(new Quest(4, "iadd:f_ham_cheese_toast", "황금의 시대", 2, 1));
+    public static void setupQuests() {
+        if (ALL_QUESTS.isEmpty()) {
+            ALL_QUESTS.add(new Quest(1, "iadd:f_corn", "사과 가져오기", 1, 1));
+            ALL_QUESTS.add(new Quest(2, "iadd:f_sausage", "배고파요!", 1, 1));
+            ALL_QUESTS.add(new Quest(3, "iadd:f_cream", "귀한 보석", 2, 1));
+            ALL_QUESTS.add(new Quest(4, "iadd:f_ham_cheese_toast", "황금의 시대", 2, 1));
+        }
     }
 
 

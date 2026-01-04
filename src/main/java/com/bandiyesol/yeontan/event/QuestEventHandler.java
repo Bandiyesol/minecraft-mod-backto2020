@@ -67,7 +67,7 @@ public class QuestEventHandler {
 
                 if (quest != null) {
                     // 해당 플레이어에게만 패킷 전송
-                    QuestPacketHandler.INSTANCE.sendTo(
+                    QuestPacketHandler.getInstance().sendTo(
                             new QuestMessage(npc.getEntityId(), quest.getItemName(), quest.getQuestTitle(), true),
                             player
                     );
@@ -125,7 +125,7 @@ public class QuestEventHandler {
 
         extraData.setTag("YeontanQuest", questData);
 
-        QuestPacketHandler.INSTANCE.sendToAll(
+        QuestPacketHandler.getInstance().sendToAll(
                 new QuestMessage(
                         target.getEntityId(),
                         quest.getItemName(),
@@ -151,7 +151,7 @@ public class QuestEventHandler {
             ComMoney.giveCoin(player, quest.getRewardAmount());
             Helper.sendToTeam(server, teamName, "§a[완료] §f" + player.getName() + "님이 해결!");
 
-            QuestPacketHandler.INSTANCE.sendToAll(
+            QuestPacketHandler.getInstance().sendToAll(
                     new QuestMessage(target.getEntityId(),
                             "",
                             "", false
@@ -175,7 +175,7 @@ public class QuestEventHandler {
 
         QuestHelper.spawnQuestNpc(target);
         target.setDead();
-        QuestPacketHandler.INSTANCE.sendToAll(
+        QuestPacketHandler.getInstance().sendToAll(
                 new QuestMessage(target.getEntityId(),
                         "",
                         "",
