@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 public class QuestHelper {
 
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    public static final String[] CLONE_POOL = {"예솔", "이솔", "현솔"};
+    public static final String[] CLONE_POOL = {"아경", "재경", "연경", "보경", "경빈", "예빈", "채빈"};
     private static final Random RANDOM = new Random();
 
 
