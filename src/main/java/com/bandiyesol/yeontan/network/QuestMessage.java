@@ -48,10 +48,13 @@ public class QuestMessage implements IMessage {
     public static class Handler implements IMessageHandler<QuestMessage, IMessage> {
         @Override
         public IMessage onMessage(QuestMessage message, MessageContext context) {
-            Minecraft mc = Minecraft.getMinecraft();
+            if (context.side.isClient()) { handleClientMessage(message); }
+            return null;
+        }
 
-            mc.addScheduledTask(() -> {
-                if (message.isVisible) {
+        private void handleClientMessage(QuestMessage message) {
+            net.minecraft.client.Minecraft.getMinecraft().addScheduledTask(() -> {
+                if (message.isVisible()) {
                     QuestRenderHandler.activeRenderQuests.put(
                             message.getEntityId(),
                             new QuestDisplayData(message.getItemStackName(), message.getQuestTitle())
@@ -62,8 +65,6 @@ public class QuestMessage implements IMessage {
                     QuestRenderHandler.activeRenderQuests.remove(message.getEntityId());
                 }
             });
-
-            return null;
         }
     }
 }
