@@ -5,18 +5,43 @@ import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.TextComponentString;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.List;
 
 public class CommandSetQuestLevel extends CommandBase {
 
     @Override
-    public String getName() { return "quest"; }
+    @Nonnull
+    public String getName() { 
+        return "quest"; 
+    }
 
     @Override
-    public String getUsage(ICommandSender sender) { return "/quest <1/2>"; }
+    @Nonnull
+    public String getUsage(@Nonnull ICommandSender sender) { 
+        return "/quest <1/2>"; 
+    }
 
     @Override
-    public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
+    public List<String> getAliases() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> getTabCompletions(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender, String[] args, @Nullable BlockPos targetPos) {
+        if (args.length == 1) {
+            return getListOfStringsMatchingLastWord(args, "1", "2");
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
+    public void execute(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender, String[] args) throws CommandException {
         if (args.length < 1) return;
         QuestManager.currentSeverLevel = Integer.parseInt(args[0]);
         sender.sendMessage(new TextComponentString("퀘스트 레벨이 " + args[0] + "단계로 설정되었습니다."));

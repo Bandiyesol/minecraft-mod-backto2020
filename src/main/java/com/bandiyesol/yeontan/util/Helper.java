@@ -18,7 +18,7 @@ public class Helper {
     public static Entity getMouseOverEntity(EntityPlayer player, double distance) {
         Vec3d start = player.getPositionEyes(1.0F);
         Vec3d look = player.getLook(1.0F);
-        Vec3d end = start.addVector(look.x * distance, look.y * distance, look.z * distance);
+        Vec3d end = start.add(look.x * distance, look.y * distance, look.z * distance);
 
         Entity pointedEntity = null;
         List<Entity> list = player.world.getEntitiesWithinAABBExcludingEntity(player, player.getEntityBoundingBox().expand(look.x * distance, look.y * distance, look.z * distance).grow(1.0D, 1.0D, 1.0D));

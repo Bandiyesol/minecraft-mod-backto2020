@@ -31,10 +31,9 @@ dependencies {
 }
 
 minecraft {
-    // 2859 대신 2847 또는 2860으로 변경해 봅니다. (2847이 현재 가장 잘 찾아집니다)
     version = "1.12.2-14.23.5.2847"
     runDir = "run"
-    mappings = "snapshot_20171003"
+    mappings = "stable_39"
 }
 
 // [추가] 1.12.2에서 리소스 로딩 문제를 방지하는 실무용 코드
