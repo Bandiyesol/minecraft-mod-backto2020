@@ -123,7 +123,6 @@ public class QuestService {
         
         // 중복 처리 방지
         if (QuestStateManager.isProcessing(npcId)) {
-            System.out.println("[QuestLog] NPC " + npcId + " is already being processed, skipping...");
             return;
         }
         

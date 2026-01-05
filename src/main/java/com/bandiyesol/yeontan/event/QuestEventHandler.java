@@ -63,7 +63,6 @@ public class QuestEventHandler {
                     if (questData.hasKey("ExpireTime")) {
                         long expireTime = questData.getLong("ExpireTime");
                         if (currentTime > expireTime) {
-                            System.out.println("[QuestLog] Quest expired for NPC " + npcId);
                             QuestService.handleQuestExpiration(npc);
                             expiredNpcIds.add(npcId);
                         }
@@ -86,21 +85,27 @@ public class QuestEventHandler {
         if (!(event.player instanceof EntityPlayerMP)) return;
         EntityPlayerMP player = (EntityPlayerMP) event.player;
 
-        // 최적화: activeQuestNpcIds만 검사하여 퀘스트가 있는 NPC만 처리
-        WorldServer world = player.getServerWorld();
-        Set<Integer> activeQuestNpcIds = QuestStateManager.getActiveQuestNpcIds();
-        for (Integer npcId : activeQuestNpcIds) {
-            EntityCustomNpc npc = (EntityCustomNpc) world.getEntityByID(npcId);
-            if (npc != null && !npc.isDead && CLONE_NAMES.contains(npc.getName())) {
+        // 클라이언트 초기화: 모든 퀘스트 정보 제거
+        QuestPacketHandler.getInstance().sendTo(
+                new QuestMessage(-1, "", "", false),
+                player
+        );
+
+        // 모든 월드에서 실제로 퀘스트가 있는 NPC 찾기
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        if (server == null) return;
+
+        for (WorldServer world : server.worlds) {
+            for (EntityCustomNpc npc : world.getEntities(EntityCustomNpc.class,
+                    n -> n != null && !n.isDead && CLONE_NAMES.contains(n.getName()))) {
                 NBTTagCompound extraData = npc.getEntityData();
                 if (extraData.hasKey("YeontanQuest")) {
                     NBTTagCompound qData = extraData.getCompoundTag("YeontanQuest");
                     Quest quest = QuestManager.getQuestById(qData.getInteger("QuestID"));
 
                     if (quest != null) {
-                        // 해당 플레이어에게만 패킷 전송
                         QuestPacketHandler.getInstance().sendTo(
-                                new QuestMessage(npcId, quest.getItemName(), quest.getQuestTitle(), true),
+                                new QuestMessage(npc.getEntityId(), quest.getItemName(), quest.getQuestTitle(), true),
                                 player
                         );
                     }
@@ -127,7 +132,6 @@ public class QuestEventHandler {
         }
 
         NBTTagCompound extraData = target.getEntityData();
-        System.out.println("NPC NBT Has Key: " + extraData.hasKey("YeontanQuest"));
 
         if (!extraData.hasKey("YeontanQuest")) {
             QuestService.handleQuestAssignment(teamName, target);
@@ -149,12 +153,6 @@ public class QuestEventHandler {
             }
             
             if (ownerTeam.equals(teamName)) {
-                // 완료 시에도 팀 멤버인지 재확인
-                String currentTeam = Helper.getPlayerTeamName(player);
-                if (currentTeam == null || !currentTeam.equals(teamName)) {
-                    player.sendMessage(new TextComponentString("§c[BT2020] §f퀘스트를 완료하려면 해당 팀에 속해있어야 합니다."));
-                    return;
-                }
                 try {
                     QuestService.handleQuestCompletion(player, target, teamName, questData);
                 } catch (CommandException e) {

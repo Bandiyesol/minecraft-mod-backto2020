@@ -73,16 +73,11 @@ public class CommandQuest extends CommandBase {
     
     @Override
     public boolean checkPermission(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender) { 
-        // OP 권한 체크
         if (sender instanceof EntityPlayerMP) {
             EntityPlayerMP player = (EntityPlayerMP) sender;
             com.mojang.authlib.GameProfile profile = player.getGameProfile();
-            if (profile != null) {
-                return server.getPlayerList().getOppedPlayers().getEntry(profile) != null;
-            }
-            return false;
+            return profile != null && server.getPlayerList().getOppedPlayers().getEntry(profile) != null;
         }
-        // 콘솔이나 명령 블록은 항상 허용
         return true;
     }
 

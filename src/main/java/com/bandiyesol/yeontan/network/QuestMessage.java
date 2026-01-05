@@ -2,7 +2,6 @@ package com.bandiyesol.yeontan.network;
 
 import com.bandiyesol.yeontan.client.QuestRenderHandler;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.client.Minecraft;
 import net.minecraftforge.fml.common.network.ByteBufUtils;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
@@ -54,14 +53,18 @@ public class QuestMessage implements IMessage {
 
         private void handleClientMessage(QuestMessage message) {
             net.minecraft.client.Minecraft.getMinecraft().addScheduledTask(() -> {
+                // entityId가 -1이면 모든 퀘스트 정보 초기화
+                if (message.getEntityId() == -1) {
+                    QuestRenderHandler.activeRenderQuests.clear();
+                    return;
+                }
+
                 if (message.isVisible()) {
                     QuestRenderHandler.activeRenderQuests.put(
                             message.getEntityId(),
                             new QuestDisplayData(message.getItemStackName(), message.getQuestTitle())
                     );
-                }
-
-                else {
+                } else {
                     QuestRenderHandler.activeRenderQuests.remove(message.getEntityId());
                 }
             });

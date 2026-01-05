@@ -2,7 +2,6 @@ package com.bandiyesol.yeontan.util;
 
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.fml.common.FMLCommonHandler;
@@ -52,18 +51,15 @@ public class QuestHelper {
         // 중복 스폰 방지: 같은 위치에 이미 스폰 중이면 스킵
         String locationKey = String.format("%.1f,%.1f,%.1f", x, y, z);
         if (spawningLocations.contains(locationKey)) {
-            System.out.println("[QuestLog] NPC already spawning at location: " + locationKey);
             return;
         }
         
         spawningLocations.add(locationKey);
 
         // 3. 명령어 구성: /noppes clone spawn <이름> <탭> <좌표>
-        // 좌표 형식을 명확히 하기 위해 String.format 사용
         scheduler.schedule(() -> {
             server.addScheduledTask(() -> {
                 String command = String.format("noppes clone spawn %s 0 %s %.2f %.2f %.2f", selectedClone, selectedClone, x, y, z);
-                System.out.println("[QuestLog] Executing Command: " + command);
                 try {
                     server.getCommandManager().executeCommand(Objects.requireNonNull(entity), Objects.requireNonNull(command));
                 } finally {
@@ -82,65 +78,77 @@ public class QuestHelper {
         WorldServer world = server.getWorld(location.dimension);
         if (world == null) return;
 
-        // 중복 스폰 방지: 같은 위치에 이미 스폰 중이면 스킵
+        // 중복 스폰 방지
         String locationKey = String.format("%d:%.1f,%.1f,%.1f", location.dimension, location.x, location.y, location.z);
         if (spawningLocations.contains(locationKey)) {
-            System.out.println("[QuestLog] NPC already spawning at location: " + locationKey);
             return;
         }
         
         spawningLocations.add(locationKey);
-        
-        // 랜덤하게 클론 선택
         String selectedClone = CLONE_POOL[RANDOM.nextInt(CLONE_POOL.length)];
         
-        // 스폰 작업을 Future로 추적 (취소 가능하도록)
         ScheduledFuture<?> future = scheduler.schedule(() -> {
-            // 모니터링 중인 위치면 스폰 취소
             if (monitoringLocations.contains(locationKey)) {
-                System.out.println("[QuestLog] Spawn cancelled for location (stop command active): " + locationKey);
                 spawningLocations.remove(locationKey);
                 scheduledSpawns.remove(locationKey);
                 return;
             }
             
             server.addScheduledTask(() -> {
-                String command = String.format("noppes clone spawn %s 0 %s %.2f %.2f %.2f", 
+                // 해당 위치에 있는 엔티티 찾기 (spawnQuestNpc와 동일한 방식)
+                Entity executorEntity = null;
+                for (Entity entity : world.loadedEntityList) {
+                    if (entity != null && !entity.isDead) {
+                        executorEntity = entity;
+                        break;
+                    }
+                }
+                
+                if (executorEntity == null) {
+                    spawningLocations.remove(locationKey);
+                    scheduledSpawns.remove(locationKey);
+                    return;
+                }
+                
+                // executorEntity의 위치를 목표 위치로 임시 변경
+                double oldX = executorEntity.posX;
+                double oldY = executorEntity.posY;
+                double oldZ = executorEntity.posZ;
+                executorEntity.posX = location.x;
+                executorEntity.posY = location.y;
+                executorEntity.posZ = location.z;
+                
+                String command = String.format("noppes clone spawn %s 0 %s %.2f %.2f %.2f",
                     selectedClone, selectedClone, location.x, location.y, location.z);
-                System.out.println("[QuestLog] Spawning NPC at location: " + command);
                 
                 try {
-                    // 명령어를 실행한 플레이어 또는 서버의 첫 번째 플레이어 사용
-                    ICommandSender executor = getICommandSender(commandSender, server);
-
-                    int result = server.getCommandManager().executeCommand(
-                        Objects.requireNonNull(executor), 
-                        Objects.requireNonNull(command)
-                    );
+                    int result = server.getCommandManager().executeCommand(executorEntity, Objects.requireNonNull(command));
+                    
+                    // 위치 복원
+                    executorEntity.posX = oldX;
+                    executorEntity.posY = oldY;
+                    executorEntity.posZ = oldZ;
+                    
                     if (result > 0) {
-                        System.out.println("[QuestLog] NPC spawned successfully");
-                        
-                        // 스폰 후 NPC를 찾아서 추적 목록에 추가 (2초 후)
                         scheduler.schedule(() -> {
                             server.addScheduledTask(() -> {
-                                // 모니터링 중이면 즉시 제거
                                 if (monitoringLocations.contains(locationKey)) {
                                     findAndRemoveNpcAtLocation(world, location);
                                 } else {
-                                    findAndTrackNpcAtLocation(world, location, selectedClone);
+                                    findAndTrackNpcAtLocation(world, location);
                                 }
                                 spawningLocations.remove(locationKey);
                                 scheduledSpawns.remove(locationKey);
                             });
                         }, 2, TimeUnit.SECONDS);
                     } else {
-                        System.err.println("[QuestLog] Command execution returned 0");
                         spawningLocations.remove(locationKey);
                         scheduledSpawns.remove(locationKey);
                     }
                 } catch (Exception e) {
-                    System.err.println("[QuestLog] Failed to spawn NPC: " + e.getMessage());
-                    e.printStackTrace();
+                    executorEntity.posX = oldX;
+                    executorEntity.posY = oldY;
+                    executorEntity.posZ = oldZ;
                     spawningLocations.remove(locationKey);
                     scheduledSpawns.remove(locationKey);
                 }
@@ -150,27 +158,9 @@ public class QuestHelper {
         scheduledSpawns.put(locationKey, future);
     }
 
-    /**
-     * ICommandSender 가져오기 (명령어 실행용)
-     */
-    private static ICommandSender getICommandSender(ICommandSender commandSender, MinecraftServer server) {
-        ICommandSender executor;
-        if (commandSender instanceof EntityPlayerMP) {
-            executor = commandSender;
-        } else {
-            // 플레이어가 없으면 서버의 첫 번째 플레이어 사용
-            if (!server.getPlayerList().getPlayers().isEmpty()) {
-                executor = server.getPlayerList().getPlayers().get(0);
-            } else {
-                // 플레이어가 없으면 서버 사용 (콘솔)
-                executor = server;
-            }
-        }
-        return executor;
-    }
 
     // 스폰 위치 근처에서 NPC를 찾아서 추적 목록에 추가
-    private static void findAndTrackNpcAtLocation(WorldServer world, QuestNpcLocationManager.SpawnLocation location, String cloneName) {
+    private static void findAndTrackNpcAtLocation(WorldServer world, QuestNpcLocationManager.SpawnLocation location) {
         // 최적화: 위치 기반 AABB 검색 사용 (모든 엔티티 검사 대신)
         double searchRadius = 5.0;
         double searchRadiusSq = searchRadius * searchRadius; // 제곱 거리로 비교 (sqrt 제거)
@@ -205,12 +195,9 @@ public class QuestHelper {
         if (server == null) return;
         
         // 1. 스폰 예정인 작업 취소
-        for (Map.Entry<String, ScheduledFuture<?>> entry : scheduledSpawns.entrySet()) {
-            String locationKey = entry.getKey();
-            ScheduledFuture<?> future = entry.getValue();
+        for (ScheduledFuture<?> future : scheduledSpawns.values()) {
             if (future != null && !future.isDone()) {
                 future.cancel(false);
-                System.out.println("[QuestLog] Cancelled scheduled spawn for location: " + locationKey);
             }
         }
         scheduledSpawns.clear();
