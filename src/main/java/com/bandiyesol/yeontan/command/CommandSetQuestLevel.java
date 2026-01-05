@@ -17,9 +17,7 @@ public class CommandSetQuestLevel extends CommandBase {
 
     @Override
     @Nonnull
-    public String getName() { 
-        return "quest"; 
-    }
+    public String getName() { return "quest"; }
 
     @Override
     @Nonnull
@@ -33,7 +31,7 @@ public class CommandSetQuestLevel extends CommandBase {
     }
 
     @Override
-    public List<String> getTabCompletions(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender, String[] args, @Nullable BlockPos targetPos) {
+    public List<String> getTabCompletions(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender, @Nonnull String[] args, @Nullable BlockPos targetPos) {
         if (args.length == 1) {
             return getListOfStringsMatchingLastWord(args, "1", "2");
         }
@@ -41,10 +39,10 @@ public class CommandSetQuestLevel extends CommandBase {
     }
 
     @Override
-    public boolean checkPermission(@Nonnull MinecraftServer server, ICommandSender sender) { return sender.canUseCommand(this.getRequiredPermissionLevel(), this.getName()); }
+    public boolean checkPermission(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender) { return sender.canUseCommand(this.getRequiredPermissionLevel(), this.getName()); }
 
     @Override
-    public void execute(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender, String[] args) throws CommandException {
+    public void execute(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender, @Nonnull String[] args) throws CommandException {
         if (args.length < 1) return;
         QuestManager.currentSeverLevel = Integer.parseInt(args[0]);
         sender.sendMessage(new TextComponentString("퀘스트 레벨이 " + args[0] + "단계로 설정되었습니다."));
