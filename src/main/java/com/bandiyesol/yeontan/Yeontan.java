@@ -5,10 +5,12 @@ import com.bandiyesol.yeontan.proxy.CommonProxy;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
 import net.minecraftforge.fml.common.SidedProxy;
+import com.bandiyesol.yeontan.util.QuestHelper;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
+import net.minecraftforge.fml.common.event.FMLServerStoppingEvent;
 
 @Mod(
         modid = Yeontan.MODID,
@@ -49,5 +51,12 @@ public class Yeontan {
     @EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
         event.registerServerCommand(new CommandQuest());
+    }
+    
+    @EventHandler
+    public void serverStopping(FMLServerStoppingEvent event) {
+        // 서버 종료 시 리소스 정리
+        QuestHelper.shutdown();
+        System.out.println("[Yeontan] Resources cleaned up");
     }
 }

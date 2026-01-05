@@ -15,6 +15,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
@@ -25,7 +26,7 @@ import java.util.*;
 public class QuestEventHandler {
 
     // HashSet으로 변경하여 contains() 성능 향상 (O(n) -> O(1))
-    private static final Set<String> CLONE_NAMES = new HashSet<>(Arrays.asList(QuestHelper.CLONE_POOL));
+    private static final Set<String> CLONE_NAMES = QuestHelper.getCloneNamesSet();
 
     private int tickCounter = 0;
 
@@ -91,13 +92,16 @@ public class QuestEventHandler {
                 player
         );
 
-        // 모든 월드에서 실제로 퀘스트가 있는 NPC 찾기
+        // 최적화: 활성 퀘스트 NPC만 검색 (모든 NPC 검색 대신)
         MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
         if (server == null) return;
 
-        for (WorldServer world : server.worlds) {
-            for (EntityCustomNpc npc : world.getEntities(EntityCustomNpc.class,
-                    n -> n != null && !n.isDead && CLONE_NAMES.contains(n.getName()))) {
+        Set<Integer> activeQuestNpcIds = QuestStateManager.getActiveQuestNpcIds();
+        if (activeQuestNpcIds.isEmpty()) return;
+
+        for (Integer npcId : activeQuestNpcIds) {
+            EntityCustomNpc npc = QuestStateManager.findNpcById(server, npcId);
+            if (npc != null && !npc.isDead) {
                 NBTTagCompound extraData = npc.getEntityData();
                 if (extraData.hasKey("YeontanQuest")) {
                     NBTTagCompound qData = extraData.getCompoundTag("YeontanQuest");
@@ -161,6 +165,17 @@ public class QuestEventHandler {
             } else {
                 player.sendMessage(new TextComponentString("§c[BT2020] §f타 팀이 수행 중입니다."));
             }
+        }
+    }
+    
+    /**
+     * 월드 언로드 시 캐시 정리
+     */
+    @SubscribeEvent
+    public void onWorldUnload(WorldEvent.Unload event) {
+        if (event.getWorld() instanceof WorldServer) {
+            WorldServer world = (WorldServer) event.getWorld();
+            QuestStateManager.onWorldUnload(world);
         }
     }
 }

@@ -12,7 +12,7 @@ public class QuestMessage implements IMessage {
     private int entityId;
     private String itemStackName;
     private String questTitle;
-    boolean isVisible;
+    private boolean isVisible;
 
     public QuestMessage() {}
 
@@ -30,6 +30,7 @@ public class QuestMessage implements IMessage {
 
     @Override
     public void fromBytes(ByteBuf buf) {
+        if (buf == null) return;
         this.entityId = buf.readInt();
         this.itemStackName = ByteBufUtils.readUTF8String(buf);
         this.questTitle = ByteBufUtils.readUTF8String(buf);
@@ -38,9 +39,11 @@ public class QuestMessage implements IMessage {
 
     @Override
     public void toBytes(ByteBuf buf) {
+        if (buf == null) return;
         buf.writeInt(entityId);
-        ByteBufUtils.writeUTF8String(buf, itemStackName);
-        ByteBufUtils.writeUTF8String(buf, this.questTitle);
+        // null 체크: ByteBufUtils는 null을 처리하지만 명시적으로 체크
+        ByteBufUtils.writeUTF8String(buf, itemStackName != null ? itemStackName : "");
+        ByteBufUtils.writeUTF8String(buf, questTitle != null ? questTitle : "");
         buf.writeBoolean(isVisible);
     }
 

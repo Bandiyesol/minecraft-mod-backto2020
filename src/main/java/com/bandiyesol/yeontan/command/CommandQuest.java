@@ -126,7 +126,7 @@ public class CommandQuest extends CommandBase {
                 return;
             }
             
-            QuestManager.currentSeverLevel = level;
+            QuestManager.currentServerLevel = level;
             sender.sendMessage(new TextComponentString("§a퀘스트 레벨이 " + level + "단계로 설정되었습니다."));
         } catch (NumberFormatException e) {
             sender.sendMessage(new TextComponentString("§c잘못된 숫자 형식입니다."));

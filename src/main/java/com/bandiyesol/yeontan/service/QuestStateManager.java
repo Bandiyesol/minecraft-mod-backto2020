@@ -15,22 +15,22 @@ import java.util.*;
  */
 public class QuestStateManager {
 
-    // 퀘스트가 있는 NPC ID를 추적하여 불필요한 검사 방지
-    private static final Set<Integer> activeQuestNpcIds = new HashSet<>();
+    // 퀘스트가 있는 NPC ID를 추적하여 불필요한 검사 방지 - 동시성 안전
+    private static final Set<Integer> activeQuestNpcIds = Collections.synchronizedSet(new HashSet<>());
     
-    // 처리 중인 NPC ID (중복 처리 방지)
-    private static final Set<Integer> processingNpcIds = new HashSet<>();
+    // 처리 중인 NPC ID (중복 처리 방지) - 동시성 안전
+    private static final Set<Integer> processingNpcIds = Collections.synchronizedSet(new HashSet<>());
     
-    // NPC ID -> WorldServer 매핑 (검색 최적화)
-    private static final Map<Integer, WorldServer> npcWorldCache = new HashMap<>();
+    // NPC ID -> WorldServer 매핑 (검색 최적화) - 동시성 안전
+    private static final Map<Integer, WorldServer> npcWorldCache = Collections.synchronizedMap(new HashMap<>());
     
-    // 팀별 플레이어 캐싱 (5초마다 갱신)
-    private static final Map<String, List<EntityPlayerMP>> teamPlayerCache = new HashMap<>();
+    // 팀별 플레이어 캐싱 (5초마다 갱신) - 동시성 안전
+    private static final Map<String, List<EntityPlayerMP>> teamPlayerCache = Collections.synchronizedMap(new HashMap<>());
     private static long lastCacheUpdate = 0;
     private static final long CACHE_UPDATE_INTERVAL = 5000; // 5초
 
     // HashSet으로 변경하여 contains() 성능 향상
-    private static final Set<String> CLONE_NAMES_SET = new HashSet<>(Arrays.asList(QuestHelper.CLONE_POOL));
+    private static final Set<String> CLONE_NAMES_SET = QuestHelper.getCloneNamesSet();
 
     /**
      * 활성 퀘스트 NPC ID 추가
@@ -125,13 +125,37 @@ public class QuestStateManager {
      * 팀 플레이어 캐시 업데이트
      */
     private static void updateTeamPlayerCache(MinecraftServer server) {
-        teamPlayerCache.clear();
-        
-        for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
-            String teamName = Helper.getPlayerTeamName(player);
-            if (teamName != null && !teamName.isEmpty()) {
-                teamPlayerCache.computeIfAbsent(teamName, k -> new ArrayList<>()).add(player);
+        synchronized (teamPlayerCache) {
+            teamPlayerCache.clear();
+            
+            for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
+                String teamName = Helper.getPlayerTeamName(player);
+                if (teamName != null && !teamName.isEmpty()) {
+                    teamPlayerCache.computeIfAbsent(teamName, k -> new ArrayList<>()).add(player);
+                }
             }
+        }
+    }
+    
+    /**
+     * 월드 언로드 시 해당 월드의 캐시 정리
+     */
+    public static void onWorldUnload(WorldServer world) {
+        synchronized (npcWorldCache) {
+            // 해당 월드의 모든 NPC 캐시 제거
+            npcWorldCache.entrySet().removeIf(entry -> entry.getValue() == world);
+        }
+        
+        synchronized (activeQuestNpcIds) {
+            // 해당 월드의 활성 퀘스트 NPC 제거
+            List<Integer> toRemove = new ArrayList<>();
+            for (Integer npcId : activeQuestNpcIds) {
+                WorldServer cachedWorld = npcWorldCache.get(npcId);
+                if (cachedWorld == world) {
+                    toRemove.add(npcId);
+                }
+            }
+            activeQuestNpcIds.removeAll(toRemove);
         }
     }
 }

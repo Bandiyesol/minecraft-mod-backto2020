@@ -25,15 +25,25 @@ public class QuestHelper {
     // HashSet으로 변경하여 contains() 성능 향상
     private static final Set<String> CLONE_NAMES_SET = new HashSet<>(Arrays.asList(CLONE_POOL));
     private static final Random RANDOM = new Random();
+    
+    /**
+     * CLONE_NAMES_SET을 반환하는 공통 메서드 (중복 정의 방지)
+     */
+    public static Set<String> getCloneNamesSet() {
+        return CLONE_NAMES_SET;
+    }
 
-    // 스폰 중인 위치 추적 (중복 스폰 방지)
-    private static final Set<String> spawningLocations = new HashSet<>();
+    // 스폰 중인 위치 추적 (중복 스폰 방지) - 동시성 안전
+    private static final Set<String> spawningLocations = Collections.synchronizedSet(new HashSet<>());
     
-    // 스폰 예정인 위치와 Future 추적 (취소용)
-    private static final Map<String, ScheduledFuture<?>> scheduledSpawns = new HashMap<>();
+    // 스폰 예정인 위치와 Future 추적 (취소용) - 동시성 안전
+    private static final Map<String, ScheduledFuture<?>> scheduledSpawns = Collections.synchronizedMap(new HashMap<>());
     
-    // stop 후 모니터링할 위치 목록 (5초 동안)
-    private static final Set<String> monitoringLocations = new HashSet<>();
+    // stop 후 모니터링할 위치 목록 (5초 동안) - 동시성 안전
+    private static final Set<String> monitoringLocations = Collections.synchronizedSet(new HashSet<>());
+    
+    // 모니터링 작업 추적 (취소용)
+    private static ScheduledFuture<?> monitoringTask = null;
     
     // --- [퀘스트 엔티티 스폰 로직] ---
     public static void spawnQuestNpc(Entity entity) {
@@ -59,9 +69,11 @@ public class QuestHelper {
         // 3. 명령어 구성: /noppes clone spawn <이름> <탭> <좌표>
         scheduler.schedule(() -> {
             server.addScheduledTask(() -> {
-                String command = String.format("noppes clone spawn %s 0 %s %.2f %.2f %.2f", selectedClone, selectedClone, x, y, z);
                 try {
+                    String command = String.format("noppes clone spawn %s 0 %s %.2f %.2f %.2f", selectedClone, selectedClone, x, y, z);
                     server.getCommandManager().executeCommand(Objects.requireNonNull(entity), Objects.requireNonNull(command));
+                } catch (Exception e) {
+                    System.err.println("[Yeontan] Failed to spawn quest NPC: " + e.getMessage());
                 } finally {
                     // 스폰 완료 후 위치 추적에서 제거 (5초 후)
                     scheduler.schedule(() -> spawningLocations.remove(locationKey), 5, TimeUnit.SECONDS);
@@ -95,7 +107,7 @@ public class QuestHelper {
             }
             
             server.addScheduledTask(() -> {
-                // 해당 위치에 있는 엔티티 찾기 (spawnQuestNpc와 동일한 방식)
+                // 해당 위치에 있는 엔티티 찾기 (명령어 실행자로 사용)
                 Entity executorEntity = null;
                 for (Entity entity : world.loadedEntityList) {
                     if (entity != null && !entity.isDead) {
@@ -110,47 +122,54 @@ public class QuestHelper {
                     return;
                 }
                 
-                // executorEntity의 위치를 목표 위치로 임시 변경
-                double oldX = executorEntity.posX;
-                double oldY = executorEntity.posY;
-                double oldZ = executorEntity.posZ;
-                executorEntity.posX = location.x;
-                executorEntity.posY = location.y;
-                executorEntity.posZ = location.z;
-                
-                String command = String.format("noppes clone spawn %s 0 %s %.2f %.2f %.2f",
-                    selectedClone, selectedClone, location.x, location.y, location.z);
-                
-                try {
-                    int result = server.getCommandManager().executeCommand(executorEntity, Objects.requireNonNull(command));
+                // 안전하게 엔티티 위치를 임시 변경하여 명령어 실행
+                // 동시성 문제 방지를 위해 엔티티를 동기화하고 try-finally로 위치 복원 보장
+                synchronized (executorEntity) {
+                    // 원래 위치 저장
+                    double oldX = executorEntity.posX;
+                    double oldY = executorEntity.posY;
+                    double oldZ = executorEntity.posZ;
                     
-                    // 위치 복원
-                    executorEntity.posX = oldX;
-                    executorEntity.posY = oldY;
-                    executorEntity.posZ = oldZ;
-                    
-                    if (result > 0) {
-                        scheduler.schedule(() -> {
-                            server.addScheduledTask(() -> {
-                                if (monitoringLocations.contains(locationKey)) {
-                                    findAndRemoveNpcAtLocation(world, location);
-                                } else {
-                                    findAndTrackNpcAtLocation(world, location);
-                                }
-                                spawningLocations.remove(locationKey);
-                                scheduledSpawns.remove(locationKey);
-                            });
-                        }, 2, TimeUnit.SECONDS);
-                    } else {
+                    try {
+                        // 목표 위치로 임시 변경
+                        executorEntity.posX = location.x;
+                        executorEntity.posY = location.y;
+                        executorEntity.posZ = location.z;
+                        
+                        // 명령어 실행
+                        String command = String.format("noppes clone spawn %s 0 %s %.2f %.2f %.2f",
+                            selectedClone, selectedClone, location.x, location.y, location.z);
+                        
+                        int result = server.getCommandManager().executeCommand(executorEntity, Objects.requireNonNull(command));
+                        
+                        if (result > 0) {
+                            scheduler.schedule(() -> {
+                                server.addScheduledTask(() -> {
+                                    if (monitoringLocations.contains(locationKey)) {
+                                        findAndRemoveNpcAtLocation(world, location);
+                                    } else {
+                                        findAndTrackNpcAtLocation(world, location);
+                                    }
+                                    spawningLocations.remove(locationKey);
+                                    scheduledSpawns.remove(locationKey);
+                                });
+                            }, 2, TimeUnit.SECONDS);
+                        } else {
+                            spawningLocations.remove(locationKey);
+                            scheduledSpawns.remove(locationKey);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("[Yeontan] Failed to spawn NPC at location: " + e.getMessage());
                         spawningLocations.remove(locationKey);
                         scheduledSpawns.remove(locationKey);
+                    } finally {
+                        // 반드시 위치 복원 (예외 발생 시에도 보장)
+                        if (!executorEntity.isDead) {
+                            executorEntity.posX = oldX;
+                            executorEntity.posY = oldY;
+                            executorEntity.posZ = oldZ;
+                        }
                     }
-                } catch (Exception e) {
-                    executorEntity.posX = oldX;
-                    executorEntity.posY = oldY;
-                    executorEntity.posZ = oldZ;
-                    spawningLocations.remove(locationKey);
-                    scheduledSpawns.remove(locationKey);
                 }
             });
         }, 1, TimeUnit.SECONDS);
@@ -171,7 +190,7 @@ public class QuestHelper {
         );
         
         for (EntityCustomNpc npc : world.getEntitiesWithinAABB(EntityCustomNpc.class, searchBox)) {
-            if (npc == null || npc.isDead || !CLONE_NAMES_SET.contains(npc.getName())) {
+            if (npc == null || npc.isDead || !getCloneNamesSet().contains(npc.getName())) {
                 continue;
             }
             
@@ -250,8 +269,13 @@ public class QuestHelper {
             List<QuestNpcLocationManager.SpawnLocation> locations, int durationSeconds) {
         if (locations.isEmpty()) return;
         
+        // 기존 모니터링 작업이 있으면 취소
+        if (monitoringTask != null && !monitoringTask.isDone()) {
+            monitoringTask.cancel(false);
+        }
+        
         // 최적화: 단일 스케줄 작업으로 변경 (반복 스케줄링 대신)
-        scheduler.scheduleAtFixedRate(() -> {
+        monitoringTask = scheduler.scheduleAtFixedRate(() -> {
             server.addScheduledTask(() -> {
                 // 모니터링이 비활성화되었으면 종료
                 if (monitoringLocations.isEmpty()) {
@@ -276,7 +300,44 @@ public class QuestHelper {
         // 모니터링 종료 스케줄
         scheduler.schedule(() -> {
             monitoringLocations.clear();
+            if (monitoringTask != null && !monitoringTask.isDone()) {
+                monitoringTask.cancel(false);
+                monitoringTask = null;
+            }
         }, durationSeconds, TimeUnit.SECONDS);
+    }
+    
+    /**
+     * 스케줄러 정리 (모드 언로드 시 호출)
+     */
+    public static void shutdown() {
+        // 모든 예정된 작업 취소
+        if (monitoringTask != null && !monitoringTask.isDone()) {
+            monitoringTask.cancel(false);
+            monitoringTask = null;
+        }
+        
+        for (ScheduledFuture<?> future : scheduledSpawns.values()) {
+            if (future != null && !future.isDone()) {
+                future.cancel(false);
+            }
+        }
+        scheduledSpawns.clear();
+        
+        // 스케줄러 종료
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        
+        // 컬렉션 정리
+        spawningLocations.clear();
+        monitoringLocations.clear();
     }
     
     // 위치에서 NPC를 찾아서 제거
@@ -291,7 +352,7 @@ public class QuestHelper {
         );
         
         for (EntityCustomNpc npc : world.getEntitiesWithinAABB(EntityCustomNpc.class, searchBox)) {
-            if (npc == null || npc.isDead || !CLONE_NAMES_SET.contains(npc.getName())) {
+            if (npc == null || npc.isDead || !getCloneNamesSet().contains(npc.getName())) {
                 continue;
             }
             
