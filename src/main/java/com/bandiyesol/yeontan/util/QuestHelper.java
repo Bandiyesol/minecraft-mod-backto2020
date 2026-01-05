@@ -1,6 +1,8 @@
 package com.bandiyesol.yeontan.util;
 
+import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.fml.common.FMLCommonHandler;
@@ -67,7 +69,7 @@ public class QuestHelper {
     }
     
     // --- [고정 위치에 NPC 스폰] ---
-    public static void spawnQuestNpcAtLocation(QuestNpcLocationManager.SpawnLocation location) {
+    public static void spawnQuestNpcAtLocation(QuestNpcLocationManager.SpawnLocation location, ICommandSender commandSender) {
         MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
         if (server == null) return;
         
@@ -102,8 +104,21 @@ public class QuestHelper {
                 System.out.println("[QuestLog] Spawning NPC at location: " + command);
                 
                 try {
-                    // 서버를 ICommandSender로 사용하여 명령어 실행
-                    int result = server.getCommandManager().executeCommand(server, command);
+                    // 명령어를 실행한 플레이어 또는 서버의 첫 번째 플레이어 사용
+                    ICommandSender executor;
+                    if (commandSender instanceof EntityPlayerMP) {
+                        executor = commandSender;
+                    } else {
+                        // 플레이어가 없으면 서버의 첫 번째 플레이어 사용
+                        if (!server.getPlayerList().getPlayers().isEmpty()) {
+                            executor = server.getPlayerList().getPlayers().get(0);
+                        } else {
+                            // 플레이어가 없으면 서버 사용 (콘솔)
+                            executor = server;
+                        }
+                    }
+                    
+                    int result = server.getCommandManager().executeCommand(executor, command);
                     if (result > 0) {
                         System.out.println("[QuestLog] NPC spawned successfully");
                         

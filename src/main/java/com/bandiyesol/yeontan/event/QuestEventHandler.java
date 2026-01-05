@@ -7,6 +7,7 @@ import com.bandiyesol.yeontan.entity.QuestManager;
 import com.bandiyesol.yeontan.util.Helper;
 import com.bandiyesol.yeontan.util.QuestHelper;
 import com.example.iadd.comm.ComMoney;
+import com.example.iadd.nick.NickTable;
 import net.minecraft.command.CommandException;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
@@ -237,7 +238,7 @@ public class QuestEventHandler {
             heldItem.shrink(1);
 
             ComMoney.giveCoin(player, quest.getRewardAmount());
-            Helper.sendToTeam(server, teamName, "§a[완료] §f" + player.getName() + "님이 해결!");
+            Helper.sendToTeam(server, teamName, "§a[완료] §f" + NickTable.getColorByName(NickTable.getColorByName(player.getName())) + "님이 해결!");
 
             QuestPacketHandler.getInstance().sendToAll(
                     new QuestMessage(target.getEntityId(),
@@ -289,18 +290,32 @@ public class QuestEventHandler {
         if (quest != null && !ownerTeam.isEmpty()) {
             // 팀 플레이어 캐시 사용 (모든 플레이어 검사 대신)
             List<EntityPlayerMP> teamPlayers = getTeamPlayers(server, ownerTeam);
-            int penaltyAmount = -quest.getRewardAmount();
             
-            for (EntityPlayerMP player : teamPlayers) {
+            if (!teamPlayers.isEmpty()) {
+                // 팀원 중 랜덤으로 한 명 선택
+                Random random = new Random();
+                EntityPlayerMP selectedPlayer = teamPlayers.get(random.nextInt(teamPlayers.size()));
+                int penaltyAmount = -quest.getRewardAmount();
+
+                String playerName = selectedPlayer.getName();
+                NickTable.getNickByName(playerName);
+                NickTable.getColorByName(playerName);
+
                 try {
-                    ComMoney.giveCoin(player, penaltyAmount);
+                    ComMoney.giveCoin(selectedPlayer, penaltyAmount);
+                    // 선택된 플레이어에게 개인 메시지
+                    selectedPlayer.sendMessage(new TextComponentString("§c[실패] §f" + quest.getQuestTitle() + " 퀘스트가 만료되어 " + quest.getRewardAmount() + "코인이 차감되었습니다."));
+                    // 팀에게 실패 메시지 전송 (누가 차감되었는지 포함)
+                    Helper.sendToTeam(server, ownerTeam, "§c[실패] §f" + quest.getQuestTitle() + " 퀘스트가 만료되어 " + playerName + "님에게 " + quest.getRewardAmount() + "코인이 차감되었습니다.");
                 } catch (Exception e) {
-                    System.err.println("[QuestLog] Failed to deduct coins from player " + player.getName() + ": " + e.getMessage());
+                    System.err.println("[QuestLog] Failed to deduct coins from player " + playerName + ": " + e.getMessage());
+                    // 에러 발생 시에도 팀에게 알림
+                    Helper.sendToTeam(server, ownerTeam, "§c[실패] §f" + quest.getQuestTitle() + " 퀘스트가 만료되었습니다.");
                 }
+            } else {
+                // 팀원이 없으면 팀에게만 메시지
+                Helper.sendToTeam(server, ownerTeam, "§c[실패] §f" + quest.getQuestTitle() + " 퀘스트가 만료되었습니다.");
             }
-            
-            // 팀에게 실패 메시지 전송
-            Helper.sendToTeam(server, ownerTeam, "§c[실패] §f" + quest.getQuestTitle() + " 퀘스트가 만료되어 " + quest.getRewardAmount() + "코인이 차감되었습니다.");
         }
 
         // 추적 목록에서 제거

@@ -159,7 +159,7 @@ public class CommandQuest extends CommandBase {
             sender.sendMessage(new TextComponentString("§a게임 시작! " + locations.size() + "개 위치에 NPC를 스폰합니다..."));
             
             for (QuestNpcLocationManager.SpawnLocation location : locations) {
-                QuestHelper.spawnQuestNpcAtLocation(location);
+                QuestHelper.spawnQuestNpcAtLocation(location, sender);
             }
             
             sender.sendMessage(new TextComponentString("§a모든 NPC가 스폰되었습니다."));
