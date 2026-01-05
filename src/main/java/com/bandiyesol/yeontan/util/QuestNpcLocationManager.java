@@ -14,10 +14,25 @@ public class QuestNpcLocationManager {
     private static final List<SpawnLocation> spawnLocations = new ArrayList<>();
     
     static {
-        // 기본 하드코딩 위치들 (예시 - 필요에 따라 수정)
-        // spawnLocations.add(new SpawnLocation(0, 100, 64, 200)); // dimension, x, y, z
-        // spawnLocations.add(new SpawnLocation(0, 200, 64, 200));
-        // spawnLocations.add(new SpawnLocation(0, 300, 64, 200));
+        spawnLocations.add(new SpawnLocation(0, -12, 79, 32));
+        spawnLocations.add(new SpawnLocation(0, -11, 79, 32));
+        spawnLocations.add(new SpawnLocation(0, -10, 79, 32));
+        spawnLocations.add(new SpawnLocation(0, -9, 79, 32));
+
+        spawnLocations.add(new SpawnLocation(0, 4, 79, 32));
+        spawnLocations.add(new SpawnLocation(0, 5, 79, 32));
+        spawnLocations.add(new SpawnLocation(0, 6, 79, 32));
+        spawnLocations.add(new SpawnLocation(0, 7, 79, 32));
+
+        spawnLocations.add(new SpawnLocation(0, 9, 79, 6));
+        spawnLocations.add(new SpawnLocation(0, 8, 79, 6));
+        spawnLocations.add(new SpawnLocation(0, 7, 79, 6));
+        spawnLocations.add(new SpawnLocation(0, 6, 79, 6));
+
+        spawnLocations.add(new SpawnLocation(0, -6, 79, 6));
+        spawnLocations.add(new SpawnLocation(0, -7, 79, 6));
+        spawnLocations.add(new SpawnLocation(0, -8, 79, 6));
+        spawnLocations.add(new SpawnLocation(0, -9, 79, 6));
     }
     
     public static class SpawnLocation {

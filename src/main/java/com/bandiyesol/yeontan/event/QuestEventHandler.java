@@ -26,6 +26,17 @@ public class QuestEventHandler {
 
     private static final List<String> CLONE_NAMES = Arrays.asList(QuestHelper.CLONE_POOL);
     private static final long LIMIT_TIME = 30 * 1000;
+    
+    // 퀘스트가 있는 NPC ID를 추적하여 불필요한 검사 방지
+    private static final Set<Integer> activeQuestNpcIds = new HashSet<>();
+    
+    // 처리 중인 NPC ID (중복 처리 방지)
+    private static final Set<Integer> processingNpcIds = new HashSet<>();
+    
+    // 팀별 플레이어 캐싱 (5초마다 갱신)
+    private static final Map<String, List<EntityPlayerMP>> teamPlayerCache = new HashMap<>();
+    private static long lastCacheUpdate = 0;
+    private static final long CACHE_UPDATE_INTERVAL = 5000; // 5초
 
     private int tickCounter = 0;
 
@@ -38,19 +49,55 @@ public class QuestEventHandler {
             tickCounter = 0;
             MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
             if (server == null) return;
+            
+            // 활성 퀘스트 NPC가 없으면 조기 종료
+            if (activeQuestNpcIds.isEmpty()) return;
 
-            for (WorldServer world : server.worlds) {
-                for (EntityCustomNpc npc : world.getEntities(EntityCustomNpc.class, n -> CLONE_NAMES.contains(n.getName()))) {
-                    NBTTagCompound nbt = npc.writeToNBT(new NBTTagCompound());
-                    if (nbt.hasKey("YeontanQuest")) {
-                        long expireTime = nbt.getCompoundTag("YeontanQuest").getLong("ExpireTime");
-                        if (System.currentTimeMillis() > expireTime) {
-                            handleQuestExpiration(npc);
+            long currentTime = System.currentTimeMillis();
+            List<Integer> expiredNpcIds = new ArrayList<>();
+            
+            // 추적 중인 NPC만 검사 (모든 NPC 검사 대신)
+            for (Integer npcId : activeQuestNpcIds) {
+                EntityCustomNpc npc = findNpcById(server, npcId);
+                if (npc == null || npc.isDead) {
+                    expiredNpcIds.add(npcId);
+                    continue;
+                }
+                
+                NBTTagCompound extraData = npc.getEntityData();
+                if (extraData.hasKey("YeontanQuest")) {
+                    NBTTagCompound questData = extraData.getCompoundTag("YeontanQuest");
+                    if (questData.hasKey("ExpireTime")) {
+                        long expireTime = questData.getLong("ExpireTime");
+                        if (currentTime > expireTime) {
+                            // 중복 처리 방지
+                            if (!processingNpcIds.contains(npcId)) {
+                                System.out.println("[QuestLog] Quest expired for NPC " + npcId);
+                                handleQuestExpiration(npc);
+                                expiredNpcIds.add(npcId);
+                            }
                         }
                     }
+                } else {
+                    // 퀘스트 데이터가 없으면 추적 목록에서 제거
+                    expiredNpcIds.add(npcId);
                 }
             }
+            
+            // 만료되거나 제거된 NPC를 추적 목록에서 제거
+            expiredNpcIds.forEach(activeQuestNpcIds::remove);
         }
+    }
+
+    // NPC ID로 NPC 찾기 (최적화된 검색)
+    private EntityCustomNpc findNpcById(MinecraftServer server, int entityId) {
+        for (WorldServer world : server.worlds) {
+            EntityCustomNpc npc = (EntityCustomNpc) world.getEntityByID(entityId);
+            if (npc != null && CLONE_NAMES.contains(npc.getName())) {
+                return npc;
+            }
+        }
+        return null;
     }
 
     @SubscribeEvent
@@ -58,8 +105,10 @@ public class QuestEventHandler {
         if (!(event.player instanceof EntityPlayerMP)) return;
         EntityPlayerMP player = (EntityPlayerMP) event.player;
 
-        // 접속한 플레이어에게 현재 월드에 있는 모든 퀘스트 NPC의 정보를 다시 전송
-        for (EntityCustomNpc npc : player.getServerWorld().getEntities(EntityCustomNpc.class, n -> true)) {
+        // 접속한 플레이어에게 현재 월드에 있는 퀘스트 NPC의 정보만 전송 (최적화)
+        // CLONE_NAMES에 해당하는 NPC만 검사
+        for (EntityCustomNpc npc : player.getServerWorld().getEntities(EntityCustomNpc.class, 
+                n -> n != null && CLONE_NAMES.contains(n.getName()))) {
             NBTTagCompound extraData = npc.getEntityData();
             if (extraData.hasKey("YeontanQuest")) {
                 NBTTagCompound qData = extraData.getCompoundTag("YeontanQuest");
@@ -149,6 +198,9 @@ public class QuestEventHandler {
         questData.setLong("ExpireTime", System.currentTimeMillis() + LIMIT_TIME);
 
         extraData.setTag("YeontanQuest", questData);
+        
+        // 퀘스트가 있는 NPC를 추적 목록에 추가
+        activeQuestNpcIds.add(target.getEntityId());
 
         QuestPacketHandler.getInstance().sendToAll(
                 new QuestMessage(
@@ -181,7 +233,7 @@ public class QuestEventHandler {
         
         ItemStack heldItem = player.getHeldItemMainhand();
 
-        if (quest != null && !heldItem.isEmpty() && Objects.requireNonNull(heldItem.getItem().getRegistryName()).toString().equals(quest.getItemName())) {
+        if (!heldItem.isEmpty() && Objects.requireNonNull(heldItem.getItem().getRegistryName()).toString().equals(quest.getItemName())) {
             heldItem.shrink(1);
 
             ComMoney.giveCoin(player, quest.getRewardAmount());
@@ -194,6 +246,9 @@ public class QuestEventHandler {
                     )
             );
 
+            // 추적 목록에서 제거
+            activeQuestNpcIds.remove(target.getEntityId());
+            
             QuestHelper.spawnQuestNpc(target);
             target.isDead = true;
             target.world.removeEntity(target);
@@ -208,26 +263,39 @@ public class QuestEventHandler {
     private void handleQuestExpiration(EntityCustomNpc target) {
         MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
         if (server == null) return;
+        
+        int npcId = target.getEntityId();
+        
+        // 중복 처리 방지
+        if (processingNpcIds.contains(npcId)) {
+            System.out.println("[QuestLog] NPC " + npcId + " is already being processed, skipping...");
+            return;
+        }
+        
+        processingNpcIds.add(npcId);
 
         // 퀘스트 정보 가져오기
         NBTTagCompound extraData = target.getEntityData();
-        if (!extraData.hasKey("YeontanQuest")) return;
+        if (!extraData.hasKey("YeontanQuest")) {
+            processingNpcIds.remove(npcId);
+            return;
+        }
         
         NBTTagCompound questData = extraData.getCompoundTag("YeontanQuest");
         int questId = questData.getInteger("QuestID");
         String ownerTeam = questData.getString("OwnerTeam");
         
         Quest quest = QuestManager.getQuestById(questId);
-        if (quest != null && ownerTeam != null && !ownerTeam.isEmpty()) {
-            // 해당 팀의 모든 플레이어에게 보상만큼 코인 차감
+        if (quest != null && !ownerTeam.isEmpty()) {
+            // 팀 플레이어 캐시 사용 (모든 플레이어 검사 대신)
+            List<EntityPlayerMP> teamPlayers = getTeamPlayers(server, ownerTeam);
             int penaltyAmount = -quest.getRewardAmount();
-            for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
-                if (ownerTeam.equals(Helper.getPlayerTeamName(player))) {
-                    try {
-                        ComMoney.giveCoin(player, penaltyAmount);
-                    } catch (Exception e) {
-                        System.err.println("[QuestLog] Failed to deduct coins from player " + player.getName() + ": " + e.getMessage());
-                    }
+            
+            for (EntityPlayerMP player : teamPlayers) {
+                try {
+                    ComMoney.giveCoin(player, penaltyAmount);
+                } catch (Exception e) {
+                    System.err.println("[QuestLog] Failed to deduct coins from player " + player.getName() + ": " + e.getMessage());
                 }
             }
             
@@ -235,8 +303,15 @@ public class QuestEventHandler {
             Helper.sendToTeam(server, ownerTeam, "§c[실패] §f" + quest.getQuestTitle() + " 퀘스트가 만료되어 " + quest.getRewardAmount() + "코인이 차감되었습니다.");
         }
 
+        // 추적 목록에서 제거
+        activeQuestNpcIds.remove(npcId);
+        
+        // 처리 완료 후 플래그 제거
+        processingNpcIds.remove(npcId);
+
         QuestHelper.spawnQuestNpc(target);
-        target.setDead();
+        target.isDead = true;
+        target.world.removeEntity(target);
         QuestPacketHandler.getInstance().sendToAll(
                 new QuestMessage(target.getEntityId(),
                         "",
@@ -244,5 +319,29 @@ public class QuestEventHandler {
                         false
                 )
         );
+    }
+    
+    // 팀 플레이어 캐시 관리 (최적화)
+    private List<EntityPlayerMP> getTeamPlayers(MinecraftServer server, String teamName) {
+        long currentTime = System.currentTimeMillis();
+        
+        // 캐시가 오래되었거나 해당 팀의 캐시가 없으면 갱신
+        if (currentTime - lastCacheUpdate > CACHE_UPDATE_INTERVAL || !teamPlayerCache.containsKey(teamName)) {
+            updateTeamPlayerCache(server);
+            lastCacheUpdate = currentTime;
+        }
+        
+        return teamPlayerCache.getOrDefault(teamName, Collections.emptyList());
+    }
+    
+    private void updateTeamPlayerCache(MinecraftServer server) {
+        teamPlayerCache.clear();
+        
+        for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
+            String teamName = Helper.getPlayerTeamName(player);
+            if (teamName != null && !teamName.isEmpty()) {
+                teamPlayerCache.computeIfAbsent(teamName, k -> new ArrayList<>()).add(player);
+            }
+        }
     }
 }

@@ -59,8 +59,10 @@ public class Helper {
 
     // --- [팀에게 메세지 전송 로직] ---
     public static void sendToTeam(MinecraftServer server, String teamName, String message) {
+        // 최적화: 팀 이름으로 필터링하여 불필요한 반복 줄이기
         for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
-            if (teamName.equals(getPlayerTeamName(player))) {
+            String playerTeam = getPlayerTeamName(player);
+            if (teamName.equals(playerTeam)) {
                 player.sendMessage(new TextComponentString(message));
             }
         }
