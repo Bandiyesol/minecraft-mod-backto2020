@@ -13,13 +13,19 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.Objects;
 
+/**
+ * 퀘스트 NPC 스폰/제거 유틸리티 클래스
+ * NPC 스폰, 제거, 위치 추적 등의 기능을 제공합니다.
+ */
 public class QuestHelper {
 
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     public static final String[] CLONE_POOL = {"아경", "재경", "연경", "보경", "경빈", "예빈", "채빈"};
+    // HashSet으로 변경하여 contains() 성능 향상
+    private static final Set<String> CLONE_NAMES_SET = new HashSet<>(Arrays.asList(CLONE_POOL));
     private static final Random RANDOM = new Random();
-
 
     // 스폰 중인 위치 추적 (중복 스폰 방지)
     private static final Set<String> spawningLocations = new HashSet<>();
@@ -59,7 +65,7 @@ public class QuestHelper {
                 String command = String.format("noppes clone spawn %s 0 %s %.2f %.2f %.2f", selectedClone, selectedClone, x, y, z);
                 System.out.println("[QuestLog] Executing Command: " + command);
                 try {
-                    server.getCommandManager().executeCommand(entity, command);
+                    server.getCommandManager().executeCommand(Objects.requireNonNull(entity), Objects.requireNonNull(command));
                 } finally {
                     // 스폰 완료 후 위치 추적에서 제거 (5초 후)
                     scheduler.schedule(() -> spawningLocations.remove(locationKey), 5, TimeUnit.SECONDS);
@@ -105,20 +111,12 @@ public class QuestHelper {
                 
                 try {
                     // 명령어를 실행한 플레이어 또는 서버의 첫 번째 플레이어 사용
-                    ICommandSender executor;
-                    if (commandSender instanceof EntityPlayerMP) {
-                        executor = commandSender;
-                    } else {
-                        // 플레이어가 없으면 서버의 첫 번째 플레이어 사용
-                        if (!server.getPlayerList().getPlayers().isEmpty()) {
-                            executor = server.getPlayerList().getPlayers().get(0);
-                        } else {
-                            // 플레이어가 없으면 서버 사용 (콘솔)
-                            executor = server;
-                        }
-                    }
-                    
-                    int result = server.getCommandManager().executeCommand(executor, command);
+                    ICommandSender executor = getICommandSender(commandSender, server);
+
+                    int result = server.getCommandManager().executeCommand(
+                        Objects.requireNonNull(executor), 
+                        Objects.requireNonNull(command)
+                    );
                     if (result > 0) {
                         System.out.println("[QuestLog] NPC spawned successfully");
                         
@@ -151,32 +149,54 @@ public class QuestHelper {
         
         scheduledSpawns.put(locationKey, future);
     }
-    
+
+    /**
+     * ICommandSender 가져오기 (명령어 실행용)
+     */
+    private static ICommandSender getICommandSender(ICommandSender commandSender, MinecraftServer server) {
+        ICommandSender executor;
+        if (commandSender instanceof EntityPlayerMP) {
+            executor = commandSender;
+        } else {
+            // 플레이어가 없으면 서버의 첫 번째 플레이어 사용
+            if (!server.getPlayerList().getPlayers().isEmpty()) {
+                executor = server.getPlayerList().getPlayers().get(0);
+            } else {
+                // 플레이어가 없으면 서버 사용 (콘솔)
+                executor = server;
+            }
+        }
+        return executor;
+    }
+
     // 스폰 위치 근처에서 NPC를 찾아서 추적 목록에 추가
     private static void findAndTrackNpcAtLocation(WorldServer world, QuestNpcLocationManager.SpawnLocation location, String cloneName) {
-        // 스폰 위치 근처(5블록 반경)에서 NPC 찾기
+        // 최적화: 위치 기반 AABB 검색 사용 (모든 엔티티 검사 대신)
         double searchRadius = 5.0;
-        List<String> cloneNames = Arrays.asList(CLONE_POOL);
+        double searchRadiusSq = searchRadius * searchRadius; // 제곱 거리로 비교 (sqrt 제거)
         
-        for (EntityCustomNpc npc : world.getEntities(EntityCustomNpc.class, 
-                n -> n != null && cloneNames.contains(n.getName()))) {
-            double distance = Math.sqrt(
-                Math.pow(npc.posX - location.x, 2) + 
-                Math.pow(npc.posY - location.y, 2) + 
-                Math.pow(npc.posZ - location.z, 2)
-            );
+        net.minecraft.util.math.AxisAlignedBB searchBox = new net.minecraft.util.math.AxisAlignedBB(
+            location.x - searchRadius, location.y - searchRadius, location.z - searchRadius,
+            location.x + searchRadius, location.y + searchRadius, location.z + searchRadius
+        );
+        
+        for (EntityCustomNpc npc : world.getEntitiesWithinAABB(EntityCustomNpc.class, searchBox)) {
+            if (npc == null || npc.isDead || !CLONE_NAMES_SET.contains(npc.getName())) {
+                continue;
+            }
+            
+            // 제곱 거리로 비교 (sqrt 연산 제거)
+            double dx = npc.posX - location.x;
+            double dy = npc.posY - location.y;
+            double dz = npc.posZ - location.z;
+            double distanceSq = dx * dx + dy * dy + dz * dz;
             
             // 위치가 가까우면 추적 목록에 추가
-            if (distance <= searchRadius) {
+            if (distanceSq <= searchRadiusSq) {
                 QuestNpcLocationManager.addActiveNpc(npc.getEntityId());
-                System.out.println("[QuestLog] Tracked NPC " + npc.getEntityId() + " at location (" + 
-                    location.x + ", " + location.y + ", " + location.z + ")");
                 return; // 첫 번째 매칭되는 NPC만 추가
             }
         }
-        
-        System.out.println("[QuestLog] Warning: Could not find NPC at location (" + 
-            location.x + ", " + location.y + ", " + location.z + ")");
     }
     
     // --- [고정 위치에 스폰된 NPC만 제거] ---
@@ -205,25 +225,33 @@ public class QuestHelper {
         
         server.addScheduledTask(() -> {
             Set<Integer> activeNpcIds = QuestNpcLocationManager.getActiveNpcIds();
-            int removedCount = 0;
             
-            // 추적된 NPC ID만 제거
+            // 최적화: 월드별로 그룹화하여 검색 횟수 감소
+            Map<WorldServer, List<Integer>> npcsByWorld = new HashMap<>();
             for (Integer npcId : activeNpcIds) {
                 for (WorldServer world : server.worlds) {
+                    EntityCustomNpc npc = (EntityCustomNpc) world.getEntityByID(npcId);
+                    if (npc != null && !npc.isDead) {
+                        npcsByWorld.computeIfAbsent(world, k -> new ArrayList<>()).add(npcId);
+                        break;
+                    }
+                }
+            }
+            
+            // 월드별로 일괄 처리
+            for (Map.Entry<WorldServer, List<Integer>> entry : npcsByWorld.entrySet()) {
+                WorldServer world = entry.getKey();
+                for (Integer npcId : entry.getValue()) {
                     EntityCustomNpc npc = (EntityCustomNpc) world.getEntityByID(npcId);
                     if (npc != null && !npc.isDead) {
                         npc.isDead = true;
                         npc.world.removeEntity(npc);
                         QuestNpcLocationManager.removeActiveNpc(npcId);
-                        removedCount++;
-                        System.out.println("[QuestLog] Removed tracked NPC " + npcId);
-                        break; // 찾았으면 다음 NPC로
                     }
                 }
             }
             
             QuestNpcLocationManager.clearActiveNpcs();
-            System.out.println("[QuestLog] Removed " + removedCount + " tracked quest NPCs");
             
             // 3. 5초 동안 모니터링하여 새로 생성되는 NPC 제거
             startLocationMonitoring(server, locations, 5);
@@ -235,55 +263,61 @@ public class QuestHelper {
             List<QuestNpcLocationManager.SpawnLocation> locations, int durationSeconds) {
         if (locations.isEmpty()) return;
         
-        System.out.println("[QuestLog] Starting location monitoring for " + durationSeconds + " seconds");
-        
-        // 1초마다 체크
-        for (int i = 1; i <= durationSeconds; i++) {
-            final int checkTime = i;
-            scheduler.schedule(() -> {
-                server.addScheduledTask(() -> {
-                    for (QuestNpcLocationManager.SpawnLocation location : locations) {
-                        String locationKey = String.format("%d:%.1f,%.1f,%.1f", 
-                            location.dimension, location.x, location.y, location.z);
-                        
-                        // 모니터링 중인 위치면 체크
-                        if (monitoringLocations.contains(locationKey)) {
-                            WorldServer world = server.getWorld(location.dimension);
-                            if (world != null) {
-                                findAndRemoveNpcAtLocation(world, location);
-                            }
+        // 최적화: 단일 스케줄 작업으로 변경 (반복 스케줄링 대신)
+        scheduler.scheduleAtFixedRate(() -> {
+            server.addScheduledTask(() -> {
+                // 모니터링이 비활성화되었으면 종료
+                if (monitoringLocations.isEmpty()) {
+                    return;
+                }
+                
+                for (QuestNpcLocationManager.SpawnLocation location : locations) {
+                    String locationKey = String.format("%d:%.1f,%.1f,%.1f", 
+                        location.dimension, location.x, location.y, location.z);
+                    
+                    // 모니터링 중인 위치면 체크
+                    if (monitoringLocations.contains(locationKey)) {
+                        WorldServer world = server.getWorld(location.dimension);
+                        if (world != null) {
+                            findAndRemoveNpcAtLocation(world, location);
                         }
                     }
-                    
-                    // 모니터링 시간 종료 시 목록 정리
-                    if (checkTime == durationSeconds) {
-                        monitoringLocations.clear();
-                        System.out.println("[QuestLog] Location monitoring completed");
-                    }
-                });
-            }, i, TimeUnit.SECONDS);
-        }
+                }
+            });
+        }, 1, 1, TimeUnit.SECONDS);
+        
+        // 모니터링 종료 스케줄
+        scheduler.schedule(() -> {
+            monitoringLocations.clear();
+        }, durationSeconds, TimeUnit.SECONDS);
     }
     
     // 위치에서 NPC를 찾아서 제거
     private static void findAndRemoveNpcAtLocation(WorldServer world, QuestNpcLocationManager.SpawnLocation location) {
+        // 최적화: 위치 기반 AABB 검색 사용
         double searchRadius = 5.0;
-        List<String> cloneNames = Arrays.asList(CLONE_POOL);
+        double searchRadiusSq = searchRadius * searchRadius; // 제곱 거리로 비교 (sqrt 제거)
         
-        for (EntityCustomNpc npc : world.getEntities(EntityCustomNpc.class, 
-                n -> n != null && !n.isDead && cloneNames.contains(n.getName()))) {
-            double distance = Math.sqrt(
-                Math.pow(npc.posX - location.x, 2) + 
-                Math.pow(npc.posY - location.y, 2) + 
-                Math.pow(npc.posZ - location.z, 2)
-            );
+        net.minecraft.util.math.AxisAlignedBB searchBox = new net.minecraft.util.math.AxisAlignedBB(
+            location.x - searchRadius, location.y - searchRadius, location.z - searchRadius,
+            location.x + searchRadius, location.y + searchRadius, location.z + searchRadius
+        );
+        
+        for (EntityCustomNpc npc : world.getEntitiesWithinAABB(EntityCustomNpc.class, searchBox)) {
+            if (npc == null || npc.isDead || !CLONE_NAMES_SET.contains(npc.getName())) {
+                continue;
+            }
+            
+            // 제곱 거리로 비교 (sqrt 연산 제거)
+            double dx = npc.posX - location.x;
+            double dy = npc.posY - location.y;
+            double dz = npc.posZ - location.z;
+            double distanceSq = dx * dx + dy * dy + dz * dz;
             
             // 위치가 가까우면 제거
-            if (distance <= searchRadius) {
+            if (distanceSq <= searchRadiusSq) {
                 npc.isDead = true;
                 npc.world.removeEntity(npc);
-                System.out.println("[QuestLog] Removed late-spawned NPC " + npc.getEntityId() + 
-                    " at location (" + location.x + ", " + location.y + ", " + location.z + ")");
                 return; // 첫 번째 매칭되는 NPC만 제거
             }
         }

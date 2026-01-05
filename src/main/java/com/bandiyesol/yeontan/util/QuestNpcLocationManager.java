@@ -72,10 +72,10 @@ public class QuestNpcLocationManager {
     }
     
     /**
-     * 모든 위치 목록 반환
+     * 모든 위치 목록 반환 (불변 뷰로 반환하여 불필요한 복사 방지)
      */
     public static List<SpawnLocation> getLocations() {
-        return new ArrayList<>(spawnLocations);
+        return Collections.unmodifiableList(spawnLocations);
     }
     
     /**
@@ -100,10 +100,10 @@ public class QuestNpcLocationManager {
     }
     
     /**
-     * 모든 활성 NPC ID 반환
+     * 모든 활성 NPC ID 반환 (불변 뷰로 반환하여 불필요한 복사 방지)
      */
     public static Set<Integer> getActiveNpcIds() {
-        return new HashSet<>(activeNpcIds);
+        return Collections.unmodifiableSet(activeNpcIds);
     }
     
     /**
