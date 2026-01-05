@@ -25,7 +25,7 @@ import java.util.*;
 public class QuestEventHandler {
 
     private static final List<String> CLONE_NAMES = Arrays.asList(QuestHelper.CLONE_POOL);
-    private static final long LIMIT_TIME = 2 * 60 * 1000;
+    private static final long LIMIT_TIME = 30 * 1000;
 
     private int tickCounter = 0;
 
@@ -86,7 +86,12 @@ public class QuestEventHandler {
         String teamName = Helper.getPlayerTeamName(player);
 
         if (!CLONE_NAMES.contains(target.getName())) return;
-        if (teamName == null) return;
+        
+        // 팀 가입 체크
+        if (teamName == null || teamName.isEmpty()) {
+            player.sendMessage(new TextComponentString("§c[BT2020] §f퀘스트를 받으려면 팀에 가입해야 합니다."));
+            return;
+        }
 
         NBTTagCompound extraData = target.getEntityData();
         System.out.println("NPC NBT Has Key: " + extraData.hasKey("YeontanQuest"));
@@ -97,8 +102,28 @@ public class QuestEventHandler {
 
         else {
             NBTTagCompound questData = extraData.getCompoundTag("YeontanQuest");
+            
+            // 퀘스트 데이터 유효성 검사
+            if (questData == null || !questData.hasKey("OwnerTeam")) {
+                player.sendMessage(new TextComponentString("§c[BT2020] §f퀘스트 데이터가 손상되었습니다."));
+                return;
+            }
 
-            if (questData.getString("OwnerTeam").equals(teamName)) {
+            String ownerTeam = questData.getString("OwnerTeam");
+            
+            // 퀘스트 완료 시에도 팀 재확인
+            if (ownerTeam == null || ownerTeam.isEmpty()) {
+                player.sendMessage(new TextComponentString("§c[BT2020] §f퀘스트 소유 팀 정보가 없습니다."));
+                return;
+            }
+            
+            if (ownerTeam.equals(teamName)) {
+                // 완료 시에도 팀 멤버인지 재확인
+                String currentTeam = Helper.getPlayerTeamName(player);
+                if (currentTeam == null || !currentTeam.equals(teamName)) {
+                    player.sendMessage(new TextComponentString("§c[BT2020] §f퀘스트를 완료하려면 해당 팀에 속해있어야 합니다."));
+                    return;
+                }
                 handleQuestCompletion(player, target, teamName, questData);
             }
 
@@ -142,7 +167,18 @@ public class QuestEventHandler {
         MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
         if (server == null) return;
 
+        // 퀘스트 데이터 유효성 검사
+        if (!questData.hasKey("QuestID")) {
+            player.sendMessage(new TextComponentString("§c[BT2020] §f퀘스트 ID가 없습니다."));
+            return;
+        }
+        
         Quest quest = QuestManager.getQuestById(questData.getInteger("QuestID"));
+        if (quest == null) {
+            player.sendMessage(new TextComponentString("§c[BT2020] §f존재하지 않는 퀘스트입니다."));
+            return;
+        }
+        
         ItemStack heldItem = player.getHeldItemMainhand();
 
         if (quest != null && !heldItem.isEmpty() && Objects.requireNonNull(heldItem.getItem().getRegistryName()).toString().equals(quest.getItemName())) {
@@ -172,6 +208,32 @@ public class QuestEventHandler {
     private void handleQuestExpiration(EntityCustomNpc target) {
         MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
         if (server == null) return;
+
+        // 퀘스트 정보 가져오기
+        NBTTagCompound extraData = target.getEntityData();
+        if (!extraData.hasKey("YeontanQuest")) return;
+        
+        NBTTagCompound questData = extraData.getCompoundTag("YeontanQuest");
+        int questId = questData.getInteger("QuestID");
+        String ownerTeam = questData.getString("OwnerTeam");
+        
+        Quest quest = QuestManager.getQuestById(questId);
+        if (quest != null && ownerTeam != null && !ownerTeam.isEmpty()) {
+            // 해당 팀의 모든 플레이어에게 보상만큼 코인 차감
+            int penaltyAmount = -quest.getRewardAmount();
+            for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
+                if (ownerTeam.equals(Helper.getPlayerTeamName(player))) {
+                    try {
+                        ComMoney.giveCoin(player, penaltyAmount);
+                    } catch (Exception e) {
+                        System.err.println("[QuestLog] Failed to deduct coins from player " + player.getName() + ": " + e.getMessage());
+                    }
+                }
+            }
+            
+            // 팀에게 실패 메시지 전송
+            Helper.sendToTeam(server, ownerTeam, "§c[실패] §f" + quest.getQuestTitle() + " 퀘스트가 만료되어 " + quest.getRewardAmount() + "코인이 차감되었습니다.");
+        }
 
         QuestHelper.spawnQuestNpc(target);
         target.setDead();

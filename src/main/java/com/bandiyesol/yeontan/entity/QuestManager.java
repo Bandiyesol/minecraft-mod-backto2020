@@ -37,7 +37,7 @@ public class QuestManager {
         ALL_QUESTS.add(new Quest(20, "iadd:f_goblin_hotdog", "도깨비 핫도그 가져오기", 2, 200000	));
         ALL_QUESTS.add(new Quest(22, "iadd:f_m_tomato_hotdog", "모짜렐라 토마토 핫도그 가져오기", 2, 400000));
 
-        ALL_QUESTS.add(new Quest(23, "iadd:f_peanut_bread", "땅콩빵 가져오기", 2, 0400));
+        ALL_QUESTS.add(new Quest(23, "iadd:f_peanut_bread", "땅콩빵 가져오기", 2, 4000));
         ALL_QUESTS.add(new Quest(24, "iadd:f_corn_bread", "옥수수빵 가져오기", 2, 4400));
         ALL_QUESTS.add(new Quest(25, "iadd:f_deli_manju", "델리만쥬쥬 가져오기", 2, 10000));
         ALL_QUESTS.add(new Quest(26, "iadd:f_egg_bread", "계란빵 가져오기", 2, 3900));

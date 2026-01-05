@@ -1,6 +1,6 @@
 package com.bandiyesol.yeontan;
 
-import com.bandiyesol.yeontan.command.CommandSetQuestLevel;
+import com.bandiyesol.yeontan.command.CommandQuest;
 import com.bandiyesol.yeontan.proxy.CommonProxy;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
@@ -48,6 +48,6 @@ public class Yeontan {
 
     @EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
-        event.registerServerCommand(new CommandSetQuestLevel());
+        event.registerServerCommand(new CommandQuest());
     }
 }
