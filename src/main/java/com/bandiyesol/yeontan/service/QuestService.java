@@ -4,6 +4,7 @@ import com.bandiyesol.yeontan.entity.Quest;
 import com.bandiyesol.yeontan.entity.QuestManager;
 import com.bandiyesol.yeontan.network.QuestMessage;
 import com.bandiyesol.yeontan.network.QuestPacketHandler;
+import com.bandiyesol.yeontan.network.QuestTimerMessage;
 import com.bandiyesol.yeontan.util.Helper;
 import com.bandiyesol.yeontan.util.QuestHelper;
 import com.bandiyesol.yeontan.util.QuestNpcLocationManager;
@@ -32,7 +33,7 @@ public class QuestService {
 
 
     // --- [퀘스트 레벨 설정] ---
-    public static void handleLevel(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
+    public static void handleLevel(ICommandSender sender, String[] args) {
         if (args.length < 2) {
             sender.sendMessage(new TextComponentString("§c사용법: /quest level <1/2>"));
             return;
@@ -52,7 +53,7 @@ public class QuestService {
 
 
     // --- [퀘스트 게임 시작/종료] ---
-    public static void handlePlay(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
+    public static void handlePlay(ICommandSender sender, String[] args) {
         if (args.length < 2) {
             sender.sendMessage(new TextComponentString("§c사용법: /quest play <start|stop>"));
             return;
@@ -86,7 +87,7 @@ public class QuestService {
 
 
     // --- [퀘스트 NPC 스폰 위치 관리] ---
-    public static void handleLocation(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
+    public static void handleLocation(ICommandSender sender, String[] args) {
         if (args.length < 2) {
             sender.sendMessage(new TextComponentString("§c사용법: /quest location <add|remove|list|clear>"));
             return;
@@ -166,6 +167,8 @@ public class QuestService {
         WorldServer world = target.world instanceof WorldServer ? (WorldServer) target.world : null;
         QuestStateManager.addActiveQuestNpc(npcId, world);
 
+        long expireTime = questData.getLong("ExpireTime");
+        
         QuestPacketHandler.getInstance().sendToAll(
                 new QuestMessage(
                         npcId,
@@ -174,6 +177,10 @@ public class QuestService {
                         true
                 )
         );
+        
+        // 만료 시간 전송
+        QuestTimerMessage timerMessage = new QuestTimerMessage(npcId, expireTime);
+        QuestPacketHandler.getInstance().sendToAll(timerMessage);
 
         Helper.sendToTeam(server, teamName, "§a[수락] §f" + quest.getQuestTitle());
     }

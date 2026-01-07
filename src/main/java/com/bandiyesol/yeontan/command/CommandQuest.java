@@ -62,9 +62,7 @@ public class CommandQuest extends CommandBase {
     }
 
     @Override
-    public int getRequiredPermissionLevel() {
-        return 2; // OP 권한 레벨 (2 = OP)
-    }
+    public int getRequiredPermissionLevel() { return 2; }
     
     @Override
     public boolean checkPermission(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender) { 
@@ -93,13 +91,13 @@ public class CommandQuest extends CommandBase {
         
         switch (subCommand) {
             case "level":
-                QuestService.handleLevel(server, sender, args);
+                QuestService.handleLevel(sender, args);
                 break;
             case "play":
-                QuestService.handlePlay(server, sender, args);
+                QuestService.handlePlay(sender, args);
                 break;
             case "location":
-                QuestService.handleLocation(server, sender, args);
+                QuestService.handleLocation(sender, args);
                 break;
             default:
                 sender.sendMessage(new TextComponentString("§c알 수 없는 서브커맨드: " + subCommand));

@@ -29,6 +29,7 @@ public class QuestPacketHandler {
         if (!messageRegistered && INSTANCE != null) {
             System.out.println("[Yeontan] Registering message handler...");
             INSTANCE.registerMessage(QuestMessage.Handler.class, QuestMessage.class, 0, Side.CLIENT);
+            INSTANCE.registerMessage(QuestTimerMessage.Handler.class, QuestTimerMessage.class, 1, Side.CLIENT);
             messageRegistered = true;
             System.out.println("[Yeontan] Message handler registered!");
         }

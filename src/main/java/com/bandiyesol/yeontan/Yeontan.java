@@ -55,7 +55,6 @@ public class Yeontan {
     
     @EventHandler
     public void serverStopping(FMLServerStoppingEvent event) {
-        // 서버 종료 시 리소스 정리
         QuestHelper.shutdown();
         System.out.println("[Yeontan] Resources cleaned up");
     }

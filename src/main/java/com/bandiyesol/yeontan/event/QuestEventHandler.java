@@ -4,6 +4,7 @@ import com.bandiyesol.yeontan.entity.Quest;
 import com.bandiyesol.yeontan.entity.QuestManager;
 import com.bandiyesol.yeontan.network.QuestMessage;
 import com.bandiyesol.yeontan.network.QuestPacketHandler;
+import com.bandiyesol.yeontan.network.QuestTimerMessage;
 import com.bandiyesol.yeontan.service.QuestService;
 import com.bandiyesol.yeontan.service.QuestStateManager;
 import com.bandiyesol.yeontan.util.Helper;
@@ -61,6 +62,10 @@ public class QuestEventHandler {
                         if (currentTime > expireTime) {
                             QuestService.handleQuestExpiration(npc);
                             expiredNpcIds.add(npcId);
+                        } else {
+                            // 만료되지 않은 퀘스트의 남은 시간을 모든 플레이어에게 전송
+                            QuestTimerMessage timerMessage = new QuestTimerMessage(npcId, expireTime);
+                            QuestPacketHandler.getInstance().sendToAll(timerMessage);
                         }
                     }
                 } else { expiredNpcIds.add(npcId); }
@@ -134,6 +139,7 @@ public class QuestEventHandler {
                     Quest quest = QuestManager.getQuestById(qData.getInteger("QuestID"));
 
                     if (quest != null) {
+                        long expireTime = qData.hasKey("ExpireTime") ? qData.getLong("ExpireTime") : 0;
                         QuestPacketHandler.getInstance().sendTo(
                                 new QuestMessage(
                                         npc.getEntityId(),
@@ -142,6 +148,10 @@ public class QuestEventHandler {
                                         true),
                                 player
                         );
+                        if (expireTime > 0) {
+                            QuestTimerMessage timerMessage = new QuestTimerMessage(npc.getEntityId(), expireTime);
+                            QuestPacketHandler.getInstance().sendTo(timerMessage, player);
+                        }
                     }
                 }
             }

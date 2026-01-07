@@ -50,6 +50,21 @@ public class QuestRenderHandler {
         GlStateManager.rotate(-renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
         GlStateManager.rotate(renderManager.playerViewX, 1.0F, 0.0F, 0.0F);
 
+        if (data.getExpireTime() > 0) {
+            long currentTime = System.currentTimeMillis();
+            long remainingTime = data.getExpireTime() - currentTime;
+            
+            if (remainingTime > 0) {
+                int totalSlots = 5;
+                long timePerSlot = 12000; 
+                int filledSlots = (int) Math.min(totalSlots, (remainingTime + timePerSlot - 1) / timePerSlot);
+                
+                GlStateManager.translate(0, 0.2, 0);
+                renderQuestGauge(fontRenderer, filledSlots, totalSlots);
+                GlStateManager.translate(0, -0.2, 0);
+            }
+        }
+
         GlStateManager.pushMatrix();
         float textScale = 0.025F;
         GlStateManager.scale(-textScale, -textScale, textScale);
@@ -70,6 +85,35 @@ public class QuestRenderHandler {
             RenderHelper.disableStandardItemLighting();
         }
 
+        GlStateManager.popMatrix();
+    }
+
+    private void renderQuestGauge(FontRenderer fontRenderer, int filledSlots, int totalSlots) {
+        float gaugeScale = 0.015F;
+        GlStateManager.pushMatrix();
+        GlStateManager.scale(-gaugeScale, -gaugeScale, gaugeScale);
+        
+        int slotWidth = 8;
+        int slotHeight = 2;
+        int spacing = 2;
+        int totalWidth = (slotWidth + spacing) * totalSlots - spacing;
+        int startX = -totalWidth / 2;
+        
+        drawRect(startX - 1, -1, startX + totalWidth + 1, slotHeight + 1, 0x80000000);
+
+        float colorRatio = (float)filledSlots / totalSlots;
+        
+        for (int i = 0; i < totalSlots; i++) {
+            int slotX = startX + i * (slotWidth + spacing);
+            if (i < filledSlots) {
+                int red = (int)(255 * (1.0F - colorRatio));
+                int green = (int)(255 * colorRatio);
+                int color = 0xFF000000 | (red << 16) | (green << 8);
+                
+                drawRect(slotX, 0, slotX + slotWidth, slotHeight, color);
+            } else { drawRect(slotX, 0, slotX + slotWidth, slotHeight, 0xFF808080); }
+        }
+        
         GlStateManager.popMatrix();
     }
 
