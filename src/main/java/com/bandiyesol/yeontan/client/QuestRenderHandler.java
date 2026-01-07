@@ -30,7 +30,6 @@ public class QuestRenderHandler {
 
         for (Map.Entry<Integer, QuestDisplayData> entry : activeRenderQuests.entrySet()) {
             Entity entity = mc.world.getEntityByID(entry.getKey());
-
             if (entity != null && !entity.isDead && mc.player.getDistanceSq(entity) < 1024) {
                 renderQuestFloatingDisplay(entity, entry.getValue(), partialTicks);
             }
@@ -79,16 +78,21 @@ public class QuestRenderHandler {
         float f = (float)(color >> 16 & 255) / 255.0F;
         float f1 = (float)(color >> 8 & 255) / 255.0F;
         float f2 = (float)(color & 255) / 255.0F;
+
         GlStateManager.enableBlend();
         GlStateManager.disableTexture2D();
         GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
         GlStateManager.color(f, f1, f2, f3);
+
         GL11.glBegin(GL11.GL_QUADS);
+
         GL11.glVertex2f(left, bottom);
         GL11.glVertex2f(right, bottom);
         GL11.glVertex2f(right, top);
         GL11.glVertex2f(left, top);
+
         GL11.glEnd();
+
         GlStateManager.enableTexture2D();
         GlStateManager.disableBlend();
     }

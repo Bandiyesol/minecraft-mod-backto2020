@@ -41,13 +41,13 @@ public class QuestMessage implements IMessage {
     public void toBytes(ByteBuf buf) {
         if (buf == null) return;
         buf.writeInt(entityId);
-        // null 체크: ByteBufUtils는 null을 처리하지만 명시적으로 체크
         ByteBufUtils.writeUTF8String(buf, itemStackName != null ? itemStackName : "");
         ByteBufUtils.writeUTF8String(buf, questTitle != null ? questTitle : "");
         buf.writeBoolean(isVisible);
     }
 
     public static class Handler implements IMessageHandler<QuestMessage, IMessage> {
+
         @Override
         public IMessage onMessage(QuestMessage message, MessageContext context) {
             if (context.side.isClient()) { handleClientMessage(message); }
@@ -56,7 +56,6 @@ public class QuestMessage implements IMessage {
 
         private void handleClientMessage(QuestMessage message) {
             net.minecraft.client.Minecraft.getMinecraft().addScheduledTask(() -> {
-                // entityId가 -1이면 모든 퀘스트 정보 초기화
                 if (message.getEntityId() == -1) {
                     QuestRenderHandler.activeRenderQuests.clear();
                     return;
@@ -65,11 +64,12 @@ public class QuestMessage implements IMessage {
                 if (message.isVisible()) {
                     QuestRenderHandler.activeRenderQuests.put(
                             message.getEntityId(),
-                            new QuestDisplayData(message.getItemStackName(), message.getQuestTitle())
+                            new QuestDisplayData(
+                                    message.getItemStackName(),
+                                    message.getQuestTitle()
+                            )
                     );
-                } else {
-                    QuestRenderHandler.activeRenderQuests.remove(message.getEntityId());
-                }
+                } else {QuestRenderHandler.activeRenderQuests.remove(message.getEntityId());}
             });
         }
     }

@@ -31,8 +31,8 @@ public class QuestManager {
         ALL_QUESTS.add(new Quest(15, "iadd:f_m_hotdog", "모짜렐라 핫도그 주세요", 1, 1200));
         ALL_QUESTS.add(new Quest(16, "iadd:f_squid_m_hotdog", "오징어 모짜렐라 핫도그 주세요", 1, 3500));
         ALL_QUESTS.add(new Quest(17, "iadd:f_spicy_m_hotdog", "모짜렐라 hot도그 주세요", 1, 9500));
-        ALL_QUESTS.add(new Quest(18, "iadd:f_mssp_hotdog", "모짜렐라 소시지 고구마 핫도그 주세요", 1, 24000));
-        ALL_QUESTS.add(new Quest(19, "iadd:f_spicy_sp_hotdog", "고구마 hot도그 주세요", 1, 49000));
+        ALL_QUESTS.add(new Quest(18, "iadd:f_mssp_hotdog", "모짜렐라 소시지 고구마 핫도그 주세요", 2, 24000));
+        ALL_QUESTS.add(new Quest(19, "iadd:f_spicy_sp_hotdog", "고구마 hot도그 주세요", 2, 49000));
         ALL_QUESTS.add(new Quest(20, "iadd:f_dssm_hotdog", "더블 소시지 고구마 모짜렐라 핫도그 주세요", 2, 100000));
         ALL_QUESTS.add(new Quest(21, "iadd:f_goblin_hotdog", "도깨비 핫도그 주세요", 2, 200000));
         ALL_QUESTS.add(new Quest(22, "iadd:f_m_tomato_hotdog", "모짜렐라 토마토 핫도그 주세요", 2, 400000));
