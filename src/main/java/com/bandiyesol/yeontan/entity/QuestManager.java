@@ -39,7 +39,7 @@ public class QuestManager {
 
         ALL_QUESTS.add(new Quest(23, "iadd:f_peanut_bread", "땅콩빵 주세요", 2, 4000));
         ALL_QUESTS.add(new Quest(24, "iadd:f_corn_bread", "옥수수빵 주세요", 2, 4400));
-        ALL_QUESTS.add(new Quest(25, "iadd:f_deli_manju", "델리만쥬쥬 주세요", 2, 10000));
+        ALL_QUESTS.add(new Quest(25, "iadd:f_deli_manju", "델리만쥬 주세요", 2, 10000));
         ALL_QUESTS.add(new Quest(26, "iadd:f_egg_bread", "계란빵 주세요", 2, 3900));
         ALL_QUESTS.add(new Quest(27, "iadd:f_cream_cheese_bread", "크림치즈빵 주세요", 2, 4300));
     }

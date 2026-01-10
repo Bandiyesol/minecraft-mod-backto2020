@@ -57,7 +57,8 @@ public class QuestRenderHandler {
             if (remainingTime > 0) {
                 int totalSlots = 5;
                 long timePerSlot = 12000; 
-                int filledSlots = (int) Math.min(totalSlots, (remainingTime + timePerSlot - 1) / timePerSlot);
+                // remainingTime이 timePerSlot보다 작으면 최소 1칸은 표시
+                int filledSlots = Math.max(1, (int) Math.min(totalSlots, (remainingTime + timePerSlot - 1) / timePerSlot));
                 
                 GlStateManager.translate(0, 0.2, 0);
                 renderQuestGauge(fontRenderer, filledSlots, totalSlots);
@@ -89,6 +90,9 @@ public class QuestRenderHandler {
     }
 
     private void renderQuestGauge(FontRenderer fontRenderer, int filledSlots, int totalSlots) {
+        // filledSlots가 0이면 게이지를 렌더링하지 않음
+        if (filledSlots <= 0) return;
+        
         float gaugeScale = 0.015F;
         GlStateManager.pushMatrix();
         GlStateManager.scale(-gaugeScale, -gaugeScale, gaugeScale);
@@ -101,6 +105,7 @@ public class QuestRenderHandler {
         
         drawRect(startX - 1, -1, startX + totalWidth + 1, slotHeight + 1, 0x80000000);
 
+        // filledSlots가 1 이상이므로 colorRatio는 항상 0보다 큼
         float colorRatio = (float)filledSlots / totalSlots;
         
         for (int i = 0; i < totalSlots; i++) {
@@ -111,7 +116,9 @@ public class QuestRenderHandler {
                 int color = 0xFF000000 | (red << 16) | (green << 8);
                 
                 drawRect(slotX, 0, slotX + slotWidth, slotHeight, color);
-            } else { drawRect(slotX, 0, slotX + slotWidth, slotHeight, 0xFF808080); }
+            } else { 
+                drawRect(slotX, 0, slotX + slotWidth, slotHeight, 0xFF808080); 
+            }
         }
         
         GlStateManager.popMatrix();
