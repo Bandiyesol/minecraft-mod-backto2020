@@ -37,12 +37,14 @@ public class CommandQuest extends CommandBase {
     }
 
     @Override
-    @Nonnull
-    public List<String> getTabCompletions(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender, @Nonnull String[] args, @Nullable BlockPos targetPos) {
-        if (args.length == 1) return getListOfStringsMatchingLastWord(args, "level", "play", "location");
+    public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args, @Nullable BlockPos targetPos) {
+        if (args.length == 1) {
+            return getListOfStringsMatchingLastWord(args, "level", "play", "location");
+        }
         
         if (args.length == 2) {
-            switch (args[0]) {
+            String subCommand = args[0].toLowerCase();
+            switch (subCommand) {
                 case "level":
                     return getListOfStringsMatchingLastWord(args, "1", "2");
                 case "play":
@@ -57,8 +59,11 @@ public class CommandQuest extends CommandBase {
             int count = QuestNpcLocationManager.getLocations().size();
             for (int i = 0; i < count; i++) {
                 indices.add(String.valueOf(i));
-            } return getListOfStringsMatchingLastWord(args, indices.toArray(new String[0]));
-        } return Collections.emptyList();
+            }
+            return getListOfStringsMatchingLastWord(args, indices.toArray(new String[0]));
+        }
+        
+        return Collections.emptyList();
     }
 
     @Override

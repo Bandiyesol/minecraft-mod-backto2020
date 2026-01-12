@@ -2,6 +2,7 @@ package com.bandiyesol.yeontan.proxy;
 
 import com.bandiyesol.yeontan.event.QuestEventHandler;
 import com.bandiyesol.yeontan.network.QuestPacketHandler;
+import com.bandiyesol.yeontan.util.LanguageHelper;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
@@ -28,6 +29,11 @@ public class CommonProxy {
     }
 
     public void postInit(FMLPostInitializationEvent event) {
+        System.out.println("[Yeontan] PostInit starting...");
+        
+        // 한글 번역 로드
+        LanguageHelper.loadKoreanTranslations();
+        
         System.out.println("[Yeontan] PostInit complete");
     }
 }

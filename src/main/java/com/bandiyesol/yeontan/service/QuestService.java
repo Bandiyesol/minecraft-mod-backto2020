@@ -6,6 +6,7 @@ import com.bandiyesol.yeontan.network.QuestMessage;
 import com.bandiyesol.yeontan.network.QuestPacketHandler;
 import com.bandiyesol.yeontan.network.QuestTimerMessage;
 import com.bandiyesol.yeontan.util.Helper;
+import com.bandiyesol.yeontan.util.LanguageHelper;
 import com.bandiyesol.yeontan.util.QuestHelper;
 import com.bandiyesol.yeontan.util.QuestNpcLocationManager;
 import com.example.iadd.comm.ComMoney;
@@ -178,7 +179,6 @@ public class QuestService {
                 )
         );
         
-        // 만료 시간 전송
         QuestTimerMessage timerMessage = new QuestTimerMessage(npcId, expireTime);
         QuestPacketHandler.getInstance().sendToAll(timerMessage);
 
@@ -206,27 +206,36 @@ public class QuestService {
         ItemStack heldItem = player.getHeldItemMainhand();
         String itemName = Objects.requireNonNull(heldItem.getItem().getRegistryName()).toString();
         if (!heldItem.isEmpty() && itemName.equals(quest.getItemName())) {
+            // 한글 번역 가져오기
+            String itemDisplayName = LanguageHelper.getItemKoreanName(itemName);
+            // 번역이 없으면 기본 displayName 사용
+            if (itemDisplayName == null) {
+                itemDisplayName = heldItem.getDisplayName();
+            }
             heldItem.shrink(1);
             ComMoney.giveCoin(player, quest.getRewardAmount());
 
-            // NPC 재생성을 위해 위치 정보를 먼저 저장한 후 제거
             QuestStateManager.removeActiveQuestNpc(target.getEntityId());
-            QuestHelper.spawnQuestNpc(target);  // 위치 정보 저장 후 스폰 예약
-            // entity 제거는 spawnQuestNpc 내부에서 위치를 저장한 후에 수행
+            QuestHelper.spawnQuestNpc(target);
             target.isDead = true;
             target.world.removeEntity(target);
 
             QuestPacketHandler.getInstance().sendToAll(
-                    new QuestMessage(target.getEntityId(),
-                            "",
-                            "", false
+                    new QuestMessage(
+						target.getEntityId(),
+                        quest.getItemName(),
+                        quest.getQuestTitle(), 
+						false	
                     )
             );
 
-            String nickName = NickTable.getNickByName(player.getName());
-            String colorCode = (nickName != null) ? NickTable.getColorByName(nickName) : "";
-            String playerDisplayName = (nickName != null && !nickName.isEmpty()) ? colorCode + nickName : player.getName();
-            Helper.sendToTeam(server, teamName, "§a[완료] §f" + playerDisplayName + "님이 해결!");
+            String playerName = player.getName();
+            String nickName = NickTable.getNickByName(playerName);
+            String displayName = (nickName != null && !nickName.isEmpty()) ? nickName : playerName;
+            String colorCode = NickTable.getColorByName(playerName);
+			
+            Helper.sendToTeam(server, teamName, "§a[완료] " + colorCode + displayName + "§f님이 " + itemDisplayName + " 해결!");
+
         } else { player.sendMessage(new TextComponentString("§c[BT2020] §f퀘스트 아이템이 아닙니다.")); }
     }
 
@@ -251,10 +260,8 @@ public class QuestService {
             Quest quest = QuestManager.getQuestById(questId);
             Helper.sendToTeam(server, ownerTeam, "§c[실패] §f" + quest.getQuestTitle() + " 퀘스트가 만료되었습니다.");
 
-            // NPC 재생성을 위해 위치 정보를 먼저 저장한 후 제거
             QuestStateManager.removeActiveQuestNpc(npcId);
-            QuestHelper.spawnQuestNpc(target);  // 위치 정보 저장 후 스폰 예약
-            // entity 제거는 spawnQuestNpc 내부에서 위치를 저장한 후에 수행
+            QuestHelper.spawnQuestNpc(target);
             target.isDead = true;
             target.world.removeEntity(target);
 
