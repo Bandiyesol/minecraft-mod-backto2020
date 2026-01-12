@@ -12,6 +12,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.lwjgl.opengl.GL11;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,39 +43,26 @@ public class QuestRenderHandler {
         FontRenderer fontRenderer = Minecraft.getMinecraft().fontRenderer;
 
         double x = entity.lastTickPosX + (entity.posX - entity.lastTickPosX) * partialTicks - renderManager.viewerPosX;
-        double y = entity.lastTickPosY + (entity.posY - entity.lastTickPosY) * partialTicks - renderManager.viewerPosY + entity.height + 1.3;
+        double y = entity.lastTickPosY + (entity.posY - entity.lastTickPosY) * partialTicks - renderManager.viewerPosY + entity.height + 1.2;
         double z = entity.lastTickPosZ + (entity.posZ - entity.lastTickPosZ) * partialTicks - renderManager.viewerPosZ;
 
-        // OpenGL 상태 저장
         GlStateManager.pushMatrix();
         GlStateManager.pushAttrib();
         
-        // 엔티티 위치로 변환 및 카메라 회전 적용
         GlStateManager.translate(x, y, z);
         GlStateManager.rotate(-renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
         GlStateManager.rotate(renderManager.playerViewX, 1.0F, 0.0F, 0.0F);
 
-        // 퀘스트 제목 렌더링
-        GlStateManager.pushMatrix();
-        float textScale = 0.018F;
-        GlStateManager.scale(-textScale, -textScale, textScale);
+        GlStateManager.enableDepth();
+        GlStateManager.depthMask(true);
 
-        String title = data.getQuestTitle();
-        if (title != null && !title.isEmpty()) {
-            int width = fontRenderer.getStringWidth(title) / 2;
-            drawTextWithOutline(fontRenderer, title, -width, 0, 0xFFFFFFFF);
-        }
-
-        GlStateManager.popMatrix();
-
-        // 게이지 렌더링 (텍스트로, 제목 위에 배치)
         if (data.getExpireTime() > 0) {
             long currentTime = System.currentTimeMillis();
             long remainingTime = data.getExpireTime() - currentTime;
             
             if (remainingTime > 0) {
-                int totalSlots = 10;
-                long timePerSlot = 6000;
+                int totalSlots = 5;
+                long timePerSlot = 12000; 
                 int filledSlots = (int) Math.min(totalSlots, (remainingTime + timePerSlot - 1) / timePerSlot);
                 
                 GlStateManager.pushMatrix();
@@ -84,9 +72,20 @@ public class QuestRenderHandler {
             }
         }
 
-        // 아이템 아이콘 렌더링
         GlStateManager.pushMatrix();
-        GlStateManager.translate(0, -0.45, 0);
+        float textScale = 0.018F;
+        GlStateManager.scale(-textScale, -textScale, textScale);
+
+        String title = data.getQuestTitle();
+        if (title != null && !title.isEmpty()) {
+            int width = fontRenderer.getStringWidth(title) / 2;
+            fontRenderer.drawString(title, -width, 0, 0xFFFFFFFF);
+        }
+
+        GlStateManager.popMatrix();
+
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(0, -0.3, 0);
         GlStateManager.scale(0.4F, 0.4F, 0.4F);
 
         String itemName = data.getItemName();
@@ -99,81 +98,68 @@ public class QuestRenderHandler {
 
         GlStateManager.popMatrix();
 
-        // OpenGL 상태 복원 (pushAttrib/popAttrib로 자동 복원됨)
+        GlStateManager.depthMask(true);
+        GlStateManager.enableDepth();
+        
         GlStateManager.popAttrib();
         GlStateManager.popMatrix();
     }
 
     private void renderQuestGauge(FontRenderer fontRenderer, int filledSlots, int totalSlots) {
-        float gaugeTextScale = 0.012F;
+        float gaugeScale = 0.012F; // 크기 줄임 (0.015F -> 0.012F)
         GlStateManager.pushMatrix();
-        GlStateManager.scale(-gaugeTextScale, -gaugeTextScale, gaugeTextScale);
+        GlStateManager.scale(-gaugeScale, -gaugeScale, gaugeScale);
         
-        String gaugeColor;
-        switch (filledSlots) {
-            case 10:
-            case 9:
-                gaugeColor = "§2";
-                break;
-            case 8:
-            case 7:
-                gaugeColor = "§a";
-                break;
-            case 6:
-            case 5:
-                gaugeColor = "§e";
-                break;
-            case 4:
-            case 3:
-                gaugeColor = "§6";
-                break;
-            case 2:
-            case 1:
-                gaugeColor = "§c";
-                break;
-            default:
-                gaugeColor = "§7";
-                break;
-        }
-        
-        StringBuilder gaugeContent = new StringBuilder();
-        gaugeContent.append(gaugeColor);
-        for (int i = 0; i < filledSlots; i++) {
-            gaugeContent.append("█");
-        }
-        gaugeContent.append("§7");
-        for (int i = filledSlots; i < totalSlots; i++) {
-            gaugeContent.append("─");
-        }
-        
-        String bracketLeft = "§0[";
-        String bracketRight = "§0]";
-        String gaugeContentStr = gaugeContent.toString();
-        
-        int bracketLeftWidth = fontRenderer.getStringWidth(bracketLeft);
-        int gaugeContentWidth = fontRenderer.getStringWidth(gaugeContentStr);
-        int bracketRightWidth = fontRenderer.getStringWidth(bracketRight);
-        int totalWidth = bracketLeftWidth + gaugeContentWidth + bracketRightWidth;
-        
+        int slotWidth = 8;
+        int slotHeight = 2;
+        int spacing = 2;
+        int totalWidth = (slotWidth + spacing) * totalSlots - spacing;
         int startX = -totalWidth / 2;
-        fontRenderer.drawString(bracketLeft, startX, 0, 0xFFFFFFFF, false);
-        fontRenderer.drawString(bracketRight, startX + bracketLeftWidth + gaugeContentWidth, 0, 0xFFFFFFFF, false);
-        fontRenderer.drawString(gaugeContentStr, startX + bracketLeftWidth, 0, 0xFFFFFFFF, false);
+        
+        drawRect(startX - 1, -1, startX + totalWidth + 1, slotHeight + 1, 0x80000000);
+
+        float colorRatio = (float)filledSlots / totalSlots;
+        
+        for (int i = 0; i < totalSlots; i++) {
+            int slotX = startX + i * (slotWidth + spacing);
+            if (i < filledSlots) {
+                int red = (int)(255 * (1.0F - colorRatio));
+                int green = (int)(255 * colorRatio);
+                int color = 0xFF000000 | (red << 16) | (green << 8);
+                
+                drawRect(slotX, 0, slotX + slotWidth, slotHeight, color);
+            } else { drawRect(slotX, 0, slotX + slotWidth, slotHeight, 0xFF808080); }
+        }
         
         GlStateManager.popMatrix();
     }
 
-    private void drawTextWithOutline(FontRenderer fontRenderer, String text, int x, int y, int color) {
-        String backgroundChar = "█";
-        int textWidth = fontRenderer.getStringWidth(text);
-        int charWidth = fontRenderer.getStringWidth(backgroundChar);
-        int backgroundWidth = (textWidth / charWidth) + 1;
+    private void drawRect(int left, int top, int right, int bottom, int color) {
+        float f3 = (float)(color >> 24 & 255) / 255.0F;
+        float f = (float)(color >> 16 & 255) / 255.0F;
+        float f1 = (float)(color >> 8 & 255) / 255.0F;
+        float f2 = (float)(color & 255) / 255.0F;
+
+        GlStateManager.enableBlend();
+        GlStateManager.disableTexture2D();
+        GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+        GlStateManager.color(f, f1, f2, f3);
         
-        StringBuilder background = new StringBuilder();
-        for (int i = 0; i < backgroundWidth; i++) {
-            background.append(backgroundChar);
-        }
-        fontRenderer.drawString("§0" + background.toString(), x - charWidth / 2, y, 0x40000000, false);
-        fontRenderer.drawString(text, x, y, color, false);
+        boolean depthEnabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
+        if (depthEnabled) { GL11.glDisable(GL11.GL_DEPTH_TEST); }
+
+        GL11.glBegin(GL11.GL_QUADS);
+
+        GL11.glVertex2f(left, bottom);
+        GL11.glVertex2f(right, bottom);
+        GL11.glVertex2f(right, top);
+        GL11.glVertex2f(left, top);
+
+        GL11.glEnd();
+
+        if (depthEnabled) { GL11.glEnable(GL11.GL_DEPTH_TEST); }
+
+        GlStateManager.enableTexture2D();
+        GlStateManager.disableBlend();
     }
 }
