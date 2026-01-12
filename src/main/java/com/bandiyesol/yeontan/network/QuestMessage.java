@@ -62,14 +62,29 @@ public class QuestMessage implements IMessage {
                 }
 
                 if (message.isVisible()) {
-                    QuestRenderHandler.activeRenderQuests.put(
-                            message.getEntityId(),
-                            new QuestDisplayData(
-                                    message.getItemStackName(),
-                                    message.getQuestTitle()
-                            )
-                    );
-                } else {QuestRenderHandler.activeRenderQuests.remove(message.getEntityId());}
+                    QuestDisplayData existingData = QuestRenderHandler.activeRenderQuests.get(message.getEntityId());
+                    if (existingData != null) {
+                        long existingExpireTime = existingData.getExpireTime();
+                        QuestRenderHandler.activeRenderQuests.put(
+                                message.getEntityId(),
+                                new QuestDisplayData(
+                                        message.getItemStackName(),
+                                        message.getQuestTitle()
+                                )
+                        );
+                        QuestRenderHandler.activeRenderQuests.get(message.getEntityId()).setExpireTime(existingExpireTime);
+                    } else {
+                        QuestRenderHandler.activeRenderQuests.put(
+                                message.getEntityId(),
+                                new QuestDisplayData(
+                                        message.getItemStackName(),
+                                        message.getQuestTitle()
+                                )
+                        );
+                    }
+                } else {
+                    QuestRenderHandler.activeRenderQuests.remove(message.getEntityId());
+                }
             });
         }
     }

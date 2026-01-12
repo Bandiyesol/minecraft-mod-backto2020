@@ -63,7 +63,6 @@ public class QuestEventHandler {
                             QuestService.handleQuestExpiration(npc);
                             expiredNpcIds.add(npcId);
                         } else {
-                            // 만료되지 않은 퀘스트의 남은 시간을 모든 플레이어에게 전송
                             QuestTimerMessage timerMessage = new QuestTimerMessage(npcId, expireTime);
                             QuestPacketHandler.getInstance().sendToAll(timerMessage);
                         }

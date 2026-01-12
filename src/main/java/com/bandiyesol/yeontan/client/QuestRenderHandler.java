@@ -29,10 +29,12 @@ public class QuestRenderHandler {
         float partialTicks = event.getPartialTicks();
 
         for (Map.Entry<Integer, QuestDisplayData> entry : activeRenderQuests.entrySet()) {
-            Entity entity = mc.world.getEntityByID(entry.getKey());
-            if (entity != null && !entity.isDead && mc.player.getDistanceSq(entity) < 1024) {
-                renderQuestFloatingDisplay(entity, entry.getValue(), partialTicks);
-            }
+            int entityId = entry.getKey();
+            QuestDisplayData data = entry.getValue();
+            Entity entity = mc.world.getEntityByID(entityId);
+
+            if (entity != null && !entity.isDead && mc.player.getDistanceSq(entity) < 1024) { renderQuestFloatingDisplay(entity, data, partialTicks); }
+            else if (entity == null || entity.isDead) { activeRenderQuests.remove(entityId); }
         }
     }
 
@@ -45,10 +47,14 @@ public class QuestRenderHandler {
         double z = entity.lastTickPosZ + (entity.posZ - entity.lastTickPosZ) * partialTicks - renderManager.viewerPosZ;
 
         GlStateManager.pushMatrix();
+        GlStateManager.pushAttrib();
+        
         GlStateManager.translate(x, y, z);
-
         GlStateManager.rotate(-renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
         GlStateManager.rotate(renderManager.playerViewX, 1.0F, 0.0F, 0.0F);
+
+        GlStateManager.enableDepth();
+        GlStateManager.depthMask(true);
 
         if (data.getExpireTime() > 0) {
             long currentTime = System.currentTimeMillis();
@@ -59,26 +65,31 @@ public class QuestRenderHandler {
                 long timePerSlot = 12000; 
                 int filledSlots = (int) Math.min(totalSlots, (remainingTime + timePerSlot - 1) / timePerSlot);
                 
+                GlStateManager.pushMatrix();
                 GlStateManager.translate(0, 0.2, 0);
                 renderQuestGauge(fontRenderer, filledSlots, totalSlots);
-                GlStateManager.translate(0, -0.2, 0);
+                GlStateManager.popMatrix();
             }
         }
 
         GlStateManager.pushMatrix();
-        float textScale = 0.025F;
+        float textScale = 0.018F;
         GlStateManager.scale(-textScale, -textScale, textScale);
 
         String title = data.getQuestTitle();
-        int width = fontRenderer.getStringWidth(title) / 2;
-        drawRect(-width - 2, -2, width + 2, 9, 0x80000000);
-        fontRenderer.drawString(title, -width, 0, 0xFFFFFFFF);
+        if (title != null && !title.isEmpty()) {
+            int width = fontRenderer.getStringWidth(title) / 2;
+            fontRenderer.drawString(title, -width, 0, 0xFFFFFFFF);
+        }
+
         GlStateManager.popMatrix();
 
-        GlStateManager.translate(0, -0.6, 0);
-        GlStateManager.scale(0.6F, 0.6F, 0.6F);
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(0, -0.3, 0);
+        GlStateManager.scale(0.4F, 0.4F, 0.4F);
 
-        Item item = Item.getByNameOrId(data.getItemName());
+        String itemName = data.getItemName();
+        Item item = (itemName != null && !itemName.isEmpty()) ? Item.getByNameOrId(itemName) : null;
         if (item != null) {
             RenderHelper.enableStandardItemLighting();
             Minecraft.getMinecraft().getRenderItem().renderItem(new ItemStack(item), ItemCameraTransforms.TransformType.FIXED);
@@ -86,10 +97,16 @@ public class QuestRenderHandler {
         }
 
         GlStateManager.popMatrix();
+
+        GlStateManager.depthMask(true);
+        GlStateManager.enableDepth();
+        
+        GlStateManager.popAttrib();
+        GlStateManager.popMatrix();
     }
 
     private void renderQuestGauge(FontRenderer fontRenderer, int filledSlots, int totalSlots) {
-        float gaugeScale = 0.015F;
+        float gaugeScale = 0.012F; // 크기 줄임 (0.015F -> 0.012F)
         GlStateManager.pushMatrix();
         GlStateManager.scale(-gaugeScale, -gaugeScale, gaugeScale);
         
@@ -127,6 +144,9 @@ public class QuestRenderHandler {
         GlStateManager.disableTexture2D();
         GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
         GlStateManager.color(f, f1, f2, f3);
+        
+        boolean depthEnabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
+        if (depthEnabled) { GL11.glDisable(GL11.GL_DEPTH_TEST); }
 
         GL11.glBegin(GL11.GL_QUADS);
 
@@ -136,6 +156,8 @@ public class QuestRenderHandler {
         GL11.glVertex2f(left, top);
 
         GL11.glEnd();
+
+        if (depthEnabled) { GL11.glEnable(GL11.GL_DEPTH_TEST); }
 
         GlStateManager.enableTexture2D();
         GlStateManager.disableBlend();

@@ -50,6 +50,12 @@ public class QuestTimerMessage implements IMessage {
                 QuestDisplayData data = QuestRenderHandler.activeRenderQuests.get(message.getEntityId());
                 if (data != null) {
                     data.setExpireTime(message.getExpireTime());
+                } else {
+                    QuestRenderHandler.activeRenderQuests.put(
+                            message.getEntityId(),
+                            new QuestDisplayData("", "")
+                    );
+                    QuestRenderHandler.activeRenderQuests.get(message.getEntityId()).setExpireTime(message.getExpireTime());
                 }
             });
         }
