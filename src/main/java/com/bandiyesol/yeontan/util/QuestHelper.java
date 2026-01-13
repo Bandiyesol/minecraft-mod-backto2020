@@ -43,13 +43,16 @@ public class QuestHelper {
     // --- [퀘스트 엔티티 스폰 로직] ---
     public static void spawnQuestNpc(Entity entity) {
         MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
-        if (server == null) return;
+        if (server == null || entity == null) return;
 
         String selectedClone = CLONE_POOL[RANDOM.nextInt(CLONE_POOL.length)];
 
+        // entity가 제거되기 전에 위치와 world 정보를 저장
         double x = entity.posX;
         double y = entity.posY;
         double z = entity.posZ;
+        WorldServer world = entity.world instanceof WorldServer ? (WorldServer) entity.world : null;
+        if (world == null) return;
         
         String locationKey = String.format("%.1f,%.1f,%.1f", x, y, z);
         if (spawningLocations.contains(locationKey)) return;
@@ -59,12 +62,31 @@ public class QuestHelper {
         scheduler.schedule(() -> {
             server.addScheduledTask(() -> {
                 try {
+                    // world에서 사용 가능한 entity를 찾아서 command executor로 사용
+                    Entity executorEntity = null;
+                    for (Entity e : world.loadedEntityList) {
+                        if (e != null && !e.isDead) {
+                            executorEntity = e;
+                            break;
+                        }
+                    }
+                    
+                    if (executorEntity == null) {
+                        System.err.println("[Yeontan] No valid entity found for command execution");
+                        spawningLocations.remove(locationKey);
+                        return;
+                    }
+                    
                     String command = String.format("noppes clone spawn %s 0 %s %.2f %.2f %.2f", selectedClone, selectedClone, x, y, z);
-                    server.getCommandManager().executeCommand(Objects.requireNonNull(entity), Objects.requireNonNull(command));
-                } catch (Exception e) { System.err.println("[Yeontan] Failed to spawn quest NPC: " + e.getMessage()); }
-                finally { scheduler.schedule(() -> spawningLocations.remove(locationKey), 5, TimeUnit.SECONDS); }
+                    server.getCommandManager().executeCommand(executorEntity, Objects.requireNonNull(command));
+                } catch (Exception e) { 
+                    System.err.println("[Yeontan] Failed to spawn quest NPC: " + e.getMessage());
+                    e.printStackTrace();
+                } finally { 
+                    scheduler.schedule(() -> spawningLocations.remove(locationKey), 5, TimeUnit.SECONDS); 
+                }
             });
-        },3, TimeUnit.SECONDS);
+        }, 3, TimeUnit.SECONDS);
     }
 
     
