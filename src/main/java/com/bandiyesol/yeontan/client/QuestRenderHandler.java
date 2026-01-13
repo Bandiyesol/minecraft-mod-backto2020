@@ -3,13 +3,10 @@ package com.bandiyesol.yeontan.client;
 import com.bandiyesol.yeontan.network.QuestDisplayData;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderHelper;
-import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
 import net.minecraft.client.renderer.entity.RenderManager;
-import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -62,23 +59,6 @@ public class QuestRenderHandler {
         GlStateManager.depthFunc(519); // GL_LEQUAL
         GlStateManager.depthMask(true); // 기본값 설정
 
-        // 게이지 렌더링
-        if (data.getExpireTime() > 0) {
-            long currentTime = System.currentTimeMillis();
-            long remainingTime = data.getExpireTime() - currentTime;
-            
-            if (remainingTime > 0) {
-                int totalSlots = 5;
-                long timePerSlot = 12000; 
-                int filledSlots = (int) Math.min(totalSlots, (remainingTime + timePerSlot - 1) / timePerSlot);
-                
-                GlStateManager.pushMatrix();
-                GlStateManager.translate(0, 0.2, 0);
-                renderQuestGauge(filledSlots, totalSlots);
-                GlStateManager.popMatrix();
-            }
-        }
-
         // 퀘스트 제목 렌더링
         GlStateManager.pushMatrix();
         float textScale = 0.018F;
@@ -91,6 +71,23 @@ public class QuestRenderHandler {
         }
 
         GlStateManager.popMatrix();
+
+        // 게이지 렌더링 (텍스트로, 제목 위에 배치)
+        if (data.getExpireTime() > 0) {
+            long currentTime = System.currentTimeMillis();
+            long remainingTime = data.getExpireTime() - currentTime;
+            
+            if (remainingTime > 0) {
+                int totalSlots = 5;
+                long timePerSlot = 12000; 
+                int filledSlots = (int) Math.min(totalSlots, (remainingTime + timePerSlot - 1) / timePerSlot);
+                
+                GlStateManager.pushMatrix();
+                GlStateManager.translate(0, 0.15, 0); // 제목 위에 배치
+                renderQuestGauge(fontRenderer, filledSlots, totalSlots);
+                GlStateManager.popMatrix();
+            }
+        }
 
         // 아이템 아이콘 렌더링
         GlStateManager.pushMatrix();
@@ -116,74 +113,43 @@ public class QuestRenderHandler {
         GlStateManager.popMatrix();
     }
 
-    private void renderQuestGauge( int filledSlots, int totalSlots) {
-        float gaugeScale = 0.012F;
+    private void renderQuestGauge(FontRenderer fontRenderer, int filledSlots, int totalSlots) {
+        // 텍스트 스케일 설정 (제목과 동일한 스케일 사용)
+        float textScale = 0.018F;
         GlStateManager.pushMatrix();
-        GlStateManager.scale(-gaugeScale, -gaugeScale, gaugeScale);
+        GlStateManager.scale(-textScale, -textScale, textScale);
         
-        int slotWidth = 8;
-        int slotHeight = 2;
-        int spacing = 2;
-        int totalWidth = (slotWidth + spacing) * totalSlots - spacing;
-        int startX = -totalWidth / 2;
-        
-        // 배경 렌더링
-        drawRect(startX - 1, -1, startX + totalWidth + 1, slotHeight + 1, 0x80000000);
-
+        // 시간에 따른 색상 결정 (녹색 → 노란색 → 빨간색)
         float colorRatio = (float)filledSlots / totalSlots;
-        
-        // 각 슬롯 렌더링
-        for (int i = 0; i < totalSlots; i++) {
-            int slotX = startX + i * (slotWidth + spacing);
-            if (i < filledSlots) {
-                int red = (int)(255 * (1.0F - colorRatio));
-                int green = (int)(255 * colorRatio);
-                int color = 0xFF000000 | (red << 16) | (green << 8);
-                
-                drawRect(slotX, 0, slotX + slotWidth, slotHeight, color);
-            } else {
-                drawRect(slotX, 0, slotX + slotWidth, slotHeight, 0xFF808080);
-            }
+        String colorCode;
+        if (colorRatio > 0.6F) {
+            colorCode = "§a"; // 녹색 (60% 이상)
+        } else if (colorRatio > 0.3F) {
+            colorCode = "§e"; // 노란색 (30-60%)
+        } else {
+            colorCode = "§c"; // 빨간색 (30% 미만)
         }
         
-        GlStateManager.popMatrix();
-    }
-
-    private void drawRect(int left, int top, int right, int bottom, int color) {
-        float alpha = (float)(color >> 24 & 255) / 255.0F;
-        float red = (float)(color >> 16 & 255) / 255.0F;
-        float green = (float)(color >> 8 & 255) / 255.0F;
-        float blue = (float)(color & 255) / 255.0F;
-
-        // OpenGL 상태 설정 (depth test는 유지, depth mask만 false로 설정)
-        GlStateManager.enableBlend();
-        GlStateManager.disableTexture2D();
-        GlStateManager.tryBlendFuncSeparate(
-            GlStateManager.SourceFactor.SRC_ALPHA,
-            GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
-            GlStateManager.SourceFactor.ONE,
-            GlStateManager.DestFactor.ZERO
-        );
-        // depth test는 유지하되, depth buffer에 기록하지 않도록 depth mask를 false로 설정
-        // 이렇게 하면 여러 게이지가 서로를 가리지 않으면서도 월드 요소와의 depth 관계는 유지됨
-        GlStateManager.depthMask(false);
-        GlStateManager.color(red, green, blue, alpha);
-
-        // Tessellator를 사용한 렌더링 (Minecraft 표준 방식)
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder buffer = tessellator.getBuffer();
+        // 게이지 텍스트 생성 (유니코드 블록 문자 사용)
+        StringBuilder gaugeText = new StringBuilder();
+        gaugeText.append(colorCode);
         
-        buffer.begin(7, DefaultVertexFormats.POSITION_COLOR);
-        buffer.pos(left, bottom, 0.0D).color(red, green, blue, alpha).endVertex();
-        buffer.pos(right, bottom, 0.0D).color(red, green, blue, alpha).endVertex();
-        buffer.pos(right, top, 0.0D).color(red, green, blue, alpha).endVertex();
-        buffer.pos(left, top, 0.0D).color(red, green, blue, alpha).endVertex();
-        tessellator.draw();
-
-        // OpenGL 상태 복원 (depth mask를 true로 복원)
-        GlStateManager.depthMask(true);
-        GlStateManager.enableTexture2D();
-        GlStateManager.disableBlend();
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        // 채워진 칸
+        for (int i = 0; i < filledSlots; i++) {
+            gaugeText.append("█");
+        }
+        
+        // 빈 칸
+        gaugeText.append("§7"); // 회색
+        for (int i = filledSlots; i < totalSlots; i++) {
+            gaugeText.append("░");
+        }
+        
+        // 텍스트 렌더링 (제목과 동일한 방식)
+        String gaugeString = gaugeText.toString();
+        int width = fontRenderer.getStringWidth(gaugeString) / 2;
+        fontRenderer.drawString(gaugeString, -width, 0, 0xFFFFFFFF);
+        
+        GlStateManager.popMatrix();
     }
 }
