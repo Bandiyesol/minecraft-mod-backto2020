@@ -48,7 +48,7 @@ public class QuestRenderHandler {
         double y = entity.lastTickPosY + (entity.posY - entity.lastTickPosY) * partialTicks - renderManager.viewerPosY + entity.height + 1.2;
         double z = entity.lastTickPosZ + (entity.posZ - entity.lastTickPosZ) * partialTicks - renderManager.viewerPosZ;
 
-        // OpenGL 상태 저장
+        // OpenGL 상태 저장 (각 엔티티 렌더링 전 상태 명확히 저장)
         GlStateManager.pushMatrix();
         GlStateManager.pushAttrib();
         
@@ -57,9 +57,10 @@ public class QuestRenderHandler {
         GlStateManager.rotate(-renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
         GlStateManager.rotate(renderManager.playerViewX, 1.0F, 0.0F, 0.0F);
 
-        // Depth 테스트 설정
+        // Depth 테스트 설정 (일관되게 관리)
         GlStateManager.enableDepth();
-        GlStateManager.depthMask(true);
+        GlStateManager.depthFunc(519); // GL_LEQUAL
+        GlStateManager.depthMask(true); // 기본값 설정
 
         // 게이지 렌더링
         if (data.getExpireTime() > 0) {
@@ -106,7 +107,7 @@ public class QuestRenderHandler {
 
         GlStateManager.popMatrix();
 
-        // OpenGL 상태 복원
+        // OpenGL 상태 복원 (각 엔티티 렌더링 후 상태 명확히 복원)
         GlStateManager.depthMask(true);
         GlStateManager.enableDepth();
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
@@ -154,7 +155,7 @@ public class QuestRenderHandler {
         float green = (float)(color >> 8 & 255) / 255.0F;
         float blue = (float)(color & 255) / 255.0F;
 
-        // OpenGL 상태 설정
+        // OpenGL 상태 설정 (depth test는 유지, depth mask만 false로 설정)
         GlStateManager.enableBlend();
         GlStateManager.disableTexture2D();
         GlStateManager.tryBlendFuncSeparate(
@@ -163,7 +164,9 @@ public class QuestRenderHandler {
             GlStateManager.SourceFactor.ONE,
             GlStateManager.DestFactor.ZERO
         );
-        GlStateManager.disableDepth();
+        // depth test는 유지하되, depth buffer에 기록하지 않도록 depth mask를 false로 설정
+        // 이렇게 하면 여러 게이지가 서로를 가리지 않으면서도 월드 요소와의 depth 관계는 유지됨
+        GlStateManager.depthMask(false);
         GlStateManager.color(red, green, blue, alpha);
 
         // Tessellator를 사용한 렌더링 (Minecraft 표준 방식)
@@ -177,8 +180,8 @@ public class QuestRenderHandler {
         buffer.pos(left, top, 0.0D).color(red, green, blue, alpha).endVertex();
         tessellator.draw();
 
-        // OpenGL 상태 복원
-        GlStateManager.enableDepth();
+        // OpenGL 상태 복원 (depth mask를 true로 복원)
+        GlStateManager.depthMask(true);
         GlStateManager.enableTexture2D();
         GlStateManager.disableBlend();
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
