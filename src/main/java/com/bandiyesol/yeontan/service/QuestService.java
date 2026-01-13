@@ -258,6 +258,9 @@ public class QuestService {
             String ownerTeam = questData.getString("OwnerTeam");
 
             Quest quest = QuestManager.getQuestById(questId);
+			String itemDisplayName = LanguageHelper.getItemKoreanName(quest.getItemName());
+			if (itemDisplayName == null) { itemDisplayName = quest.getItemName(); }
+
             Helper.sendToTeam(server, ownerTeam, "§c[실패] §f" + quest.getQuestTitle() + " 퀘스트가 만료되었습니다.");
 
             QuestStateManager.removeActiveQuestNpc(npcId);
