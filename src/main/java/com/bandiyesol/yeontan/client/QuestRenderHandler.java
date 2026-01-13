@@ -62,7 +62,7 @@ public class QuestRenderHandler {
         String title = data.getQuestTitle();
         if (title != null && !title.isEmpty()) {
             int width = fontRenderer.getStringWidth(title) / 2;
-            drawTextWithOutline(fontRenderer, title, -width, 0, 0xFFFFFFFF);
+            fontRenderer.drawString(title, -width, 0, 0xFFFFFFFF, true);
         }
 
         GlStateManager.popMatrix();
@@ -163,17 +163,4 @@ public class QuestRenderHandler {
         GlStateManager.popMatrix();
     }
 
-    private void drawTextWithOutline(FontRenderer fontRenderer, String text, int x, int y, int color) {
-        String backgroundChar = "█";
-        int textWidth = fontRenderer.getStringWidth(text);
-        int charWidth = fontRenderer.getStringWidth(backgroundChar);
-        int backgroundWidth = (textWidth / charWidth) + 1;
-        
-        StringBuilder background = new StringBuilder();
-        for (int i = 0; i < backgroundWidth; i++) {
-            background.append(backgroundChar);
-        }
-        fontRenderer.drawString("§0" + background.toString(), x - charWidth / 2, y, 0x40000000, false);
-        fontRenderer.drawString(text, x, y, color, false);
-    }
 }
