@@ -3,16 +3,18 @@ package com.bandiyesol.yeontan.client;
 import com.bandiyesol.yeontan.network.QuestDisplayData;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderHelper;
+import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
 import net.minecraft.client.renderer.entity.RenderManager;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import org.lwjgl.opengl.GL11;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,16 +48,20 @@ public class QuestRenderHandler {
         double y = entity.lastTickPosY + (entity.posY - entity.lastTickPosY) * partialTicks - renderManager.viewerPosY + entity.height + 1.2;
         double z = entity.lastTickPosZ + (entity.posZ - entity.lastTickPosZ) * partialTicks - renderManager.viewerPosZ;
 
+        // OpenGL 상태 저장
         GlStateManager.pushMatrix();
         GlStateManager.pushAttrib();
         
+        // 엔티티 위치로 변환 및 카메라 회전 적용
         GlStateManager.translate(x, y, z);
         GlStateManager.rotate(-renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
         GlStateManager.rotate(renderManager.playerViewX, 1.0F, 0.0F, 0.0F);
 
+        // Depth 테스트 설정
         GlStateManager.enableDepth();
         GlStateManager.depthMask(true);
 
+        // 게이지 렌더링
         if (data.getExpireTime() > 0) {
             long currentTime = System.currentTimeMillis();
             long remainingTime = data.getExpireTime() - currentTime;
@@ -67,11 +73,12 @@ public class QuestRenderHandler {
                 
                 GlStateManager.pushMatrix();
                 GlStateManager.translate(0, 0.2, 0);
-                renderQuestGauge(fontRenderer, filledSlots, totalSlots);
+                renderQuestGauge(filledSlots, totalSlots);
                 GlStateManager.popMatrix();
             }
         }
 
+        // 퀘스트 제목 렌더링
         GlStateManager.pushMatrix();
         float textScale = 0.018F;
         GlStateManager.scale(-textScale, -textScale, textScale);
@@ -84,6 +91,7 @@ public class QuestRenderHandler {
 
         GlStateManager.popMatrix();
 
+        // 아이템 아이콘 렌더링
         GlStateManager.pushMatrix();
         GlStateManager.translate(0, -0.3, 0);
         GlStateManager.scale(0.4F, 0.4F, 0.4F);
@@ -98,15 +106,17 @@ public class QuestRenderHandler {
 
         GlStateManager.popMatrix();
 
+        // OpenGL 상태 복원
         GlStateManager.depthMask(true);
         GlStateManager.enableDepth();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         
         GlStateManager.popAttrib();
         GlStateManager.popMatrix();
     }
 
-    private void renderQuestGauge(FontRenderer fontRenderer, int filledSlots, int totalSlots) {
-        float gaugeScale = 0.012F; // 크기 줄임 (0.015F -> 0.012F)
+    private void renderQuestGauge( int filledSlots, int totalSlots) {
+        float gaugeScale = 0.012F;
         GlStateManager.pushMatrix();
         GlStateManager.scale(-gaugeScale, -gaugeScale, gaugeScale);
         
@@ -116,10 +126,12 @@ public class QuestRenderHandler {
         int totalWidth = (slotWidth + spacing) * totalSlots - spacing;
         int startX = -totalWidth / 2;
         
+        // 배경 렌더링
         drawRect(startX - 1, -1, startX + totalWidth + 1, slotHeight + 1, 0x80000000);
 
         float colorRatio = (float)filledSlots / totalSlots;
         
+        // 각 슬롯 렌더링
         for (int i = 0; i < totalSlots; i++) {
             int slotX = startX + i * (slotWidth + spacing);
             if (i < filledSlots) {
@@ -128,38 +140,47 @@ public class QuestRenderHandler {
                 int color = 0xFF000000 | (red << 16) | (green << 8);
                 
                 drawRect(slotX, 0, slotX + slotWidth, slotHeight, color);
-            } else { drawRect(slotX, 0, slotX + slotWidth, slotHeight, 0xFF808080); }
+            } else {
+                drawRect(slotX, 0, slotX + slotWidth, slotHeight, 0xFF808080);
+            }
         }
         
         GlStateManager.popMatrix();
     }
 
     private void drawRect(int left, int top, int right, int bottom, int color) {
-        float f3 = (float)(color >> 24 & 255) / 255.0F;
-        float f = (float)(color >> 16 & 255) / 255.0F;
-        float f1 = (float)(color >> 8 & 255) / 255.0F;
-        float f2 = (float)(color & 255) / 255.0F;
+        float alpha = (float)(color >> 24 & 255) / 255.0F;
+        float red = (float)(color >> 16 & 255) / 255.0F;
+        float green = (float)(color >> 8 & 255) / 255.0F;
+        float blue = (float)(color & 255) / 255.0F;
 
+        // OpenGL 상태 설정
         GlStateManager.enableBlend();
         GlStateManager.disableTexture2D();
-        GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
-        GlStateManager.color(f, f1, f2, f3);
+        GlStateManager.tryBlendFuncSeparate(
+            GlStateManager.SourceFactor.SRC_ALPHA,
+            GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
+            GlStateManager.SourceFactor.ONE,
+            GlStateManager.DestFactor.ZERO
+        );
+        GlStateManager.disableDepth();
+        GlStateManager.color(red, green, blue, alpha);
+
+        // Tessellator를 사용한 렌더링 (Minecraft 표준 방식)
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder buffer = tessellator.getBuffer();
         
-        boolean depthEnabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
-        if (depthEnabled) { GL11.glDisable(GL11.GL_DEPTH_TEST); }
+        buffer.begin(7, DefaultVertexFormats.POSITION_COLOR);
+        buffer.pos(left, bottom, 0.0D).color(red, green, blue, alpha).endVertex();
+        buffer.pos(right, bottom, 0.0D).color(red, green, blue, alpha).endVertex();
+        buffer.pos(right, top, 0.0D).color(red, green, blue, alpha).endVertex();
+        buffer.pos(left, top, 0.0D).color(red, green, blue, alpha).endVertex();
+        tessellator.draw();
 
-        GL11.glBegin(GL11.GL_QUADS);
-
-        GL11.glVertex2f(left, bottom);
-        GL11.glVertex2f(right, bottom);
-        GL11.glVertex2f(right, top);
-        GL11.glVertex2f(left, top);
-
-        GL11.glEnd();
-
-        if (depthEnabled) { GL11.glEnable(GL11.GL_DEPTH_TEST); }
-
+        // OpenGL 상태 복원
+        GlStateManager.enableDepth();
         GlStateManager.enableTexture2D();
         GlStateManager.disableBlend();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
     }
 }
