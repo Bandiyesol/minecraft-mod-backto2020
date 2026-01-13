@@ -204,8 +204,12 @@ public class QuestService {
         }
         
         ItemStack heldItem = player.getHeldItemMainhand();
+        if (heldItem.isEmpty()) {
+            return;
+        }
+        
         String itemName = Objects.requireNonNull(heldItem.getItem().getRegistryName()).toString();
-        if (!heldItem.isEmpty() && itemName.equals(quest.getItemName())) {
+        if (itemName.equals(quest.getItemName())) {
             // 한글 번역 가져오기
             String itemDisplayName = LanguageHelper.getItemKoreanName(itemName);
             // 번역이 없으면 기본 displayName 사용
@@ -236,7 +240,9 @@ public class QuestService {
 			
             Helper.sendToTeam(server, teamName, "§a[완료] " + colorCode + displayName + "§f님이 " + itemDisplayName + " 해결!");
 
-        } else { player.sendMessage(new TextComponentString("§c[BT2020] §f퀘스트 아이템이 아닙니다.")); }
+        } else { 
+            player.sendMessage(new TextComponentString("§c[BT2020] §f퀘스트 아이템이 아닙니다.")); 
+        }
     }
 
 
