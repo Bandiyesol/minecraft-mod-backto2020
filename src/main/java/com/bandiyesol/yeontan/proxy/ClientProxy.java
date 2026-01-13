@@ -1,6 +1,5 @@
 package com.bandiyesol.yeontan.proxy;
 
-
 import com.bandiyesol.yeontan.client.QuestRenderHandler;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;

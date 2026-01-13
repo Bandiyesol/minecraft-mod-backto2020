@@ -42,10 +42,10 @@ public class QuestRenderHandler {
         FontRenderer fontRenderer = Minecraft.getMinecraft().fontRenderer;
 
         double x = entity.lastTickPosX + (entity.posX - entity.lastTickPosX) * partialTicks - renderManager.viewerPosX;
-        double y = entity.lastTickPosY + (entity.posY - entity.lastTickPosY) * partialTicks - renderManager.viewerPosY + entity.height + 1.2;
+        double y = entity.lastTickPosY + (entity.posY - entity.lastTickPosY) * partialTicks - renderManager.viewerPosY + entity.height + 1.3;
         double z = entity.lastTickPosZ + (entity.posZ - entity.lastTickPosZ) * partialTicks - renderManager.viewerPosZ;
 
-        // OpenGL 상태 저장 (각 엔티티 렌더링 전 상태 명확히 저장)
+        // OpenGL 상태 저장
         GlStateManager.pushMatrix();
         GlStateManager.pushAttrib();
         
@@ -53,11 +53,6 @@ public class QuestRenderHandler {
         GlStateManager.translate(x, y, z);
         GlStateManager.rotate(-renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
         GlStateManager.rotate(renderManager.playerViewX, 1.0F, 0.0F, 0.0F);
-
-        // Depth 테스트 설정 (일관되게 관리)
-        GlStateManager.enableDepth();
-        GlStateManager.depthFunc(519); // GL_LEQUAL
-        GlStateManager.depthMask(true); // 기본값 설정
 
         // 퀘스트 제목 렌더링
         GlStateManager.pushMatrix();
@@ -67,7 +62,7 @@ public class QuestRenderHandler {
         String title = data.getQuestTitle();
         if (title != null && !title.isEmpty()) {
             int width = fontRenderer.getStringWidth(title) / 2;
-            fontRenderer.drawString(title, -width, 0, 0xFFFFFFFF);
+            drawTextWithOutline(fontRenderer, title, -width, 0, 0xFFFFFFFF);
         }
 
         GlStateManager.popMatrix();
@@ -78,12 +73,12 @@ public class QuestRenderHandler {
             long remainingTime = data.getExpireTime() - currentTime;
             
             if (remainingTime > 0) {
-                int totalSlots = 5;
-                long timePerSlot = 12000; 
+                int totalSlots = 10;
+                long timePerSlot = 6000;
                 int filledSlots = (int) Math.min(totalSlots, (remainingTime + timePerSlot - 1) / timePerSlot);
                 
                 GlStateManager.pushMatrix();
-                GlStateManager.translate(0, 0.15, 0); // 제목 위에 배치
+                GlStateManager.translate(0, 0.2, 0);
                 renderQuestGauge(fontRenderer, filledSlots, totalSlots);
                 GlStateManager.popMatrix();
             }
@@ -91,7 +86,7 @@ public class QuestRenderHandler {
 
         // 아이템 아이콘 렌더링
         GlStateManager.pushMatrix();
-        GlStateManager.translate(0, -0.3, 0);
+        GlStateManager.translate(0, -0.45, 0);
         GlStateManager.scale(0.4F, 0.4F, 0.4F);
 
         String itemName = data.getItemName();
@@ -104,52 +99,81 @@ public class QuestRenderHandler {
 
         GlStateManager.popMatrix();
 
-        // OpenGL 상태 복원 (각 엔티티 렌더링 후 상태 명확히 복원)
-        GlStateManager.depthMask(true);
-        GlStateManager.enableDepth();
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        
+        // OpenGL 상태 복원 (pushAttrib/popAttrib로 자동 복원됨)
         GlStateManager.popAttrib();
         GlStateManager.popMatrix();
     }
 
     private void renderQuestGauge(FontRenderer fontRenderer, int filledSlots, int totalSlots) {
-        // 텍스트 스케일 설정 (제목과 동일한 스케일 사용)
-        float textScale = 0.018F;
+        float gaugeTextScale = 0.012F;
         GlStateManager.pushMatrix();
-        GlStateManager.scale(-textScale, -textScale, textScale);
+        GlStateManager.scale(-gaugeTextScale, -gaugeTextScale, gaugeTextScale);
         
-        // 시간에 따른 색상 결정 (녹색 → 노란색 → 빨간색)
-        float colorRatio = (float)filledSlots / totalSlots;
-        String colorCode;
-        if (colorRatio > 0.6F) {
-            colorCode = "§a"; // 녹색 (60% 이상)
-        } else if (colorRatio > 0.3F) {
-            colorCode = "§e"; // 노란색 (30-60%)
-        } else {
-            colorCode = "§c"; // 빨간색 (30% 미만)
+        String gaugeColor;
+        switch (filledSlots) {
+            case 10:
+            case 9:
+                gaugeColor = "§2";
+                break;
+            case 8:
+            case 7:
+                gaugeColor = "§a";
+                break;
+            case 6:
+            case 5:
+                gaugeColor = "§e";
+                break;
+            case 4:
+            case 3:
+                gaugeColor = "§6";
+                break;
+            case 2:
+            case 1:
+                gaugeColor = "§c";
+                break;
+            default:
+                gaugeColor = "§7";
+                break;
         }
         
-        // 게이지 텍스트 생성 (유니코드 블록 문자 사용)
-        StringBuilder gaugeText = new StringBuilder();
-        gaugeText.append(colorCode);
-        
-        // 채워진 칸
+        StringBuilder gaugeContent = new StringBuilder();
+        gaugeContent.append(gaugeColor);
         for (int i = 0; i < filledSlots; i++) {
-            gaugeText.append("█");
+            gaugeContent.append("█");
         }
-        
-        // 빈 칸
-        gaugeText.append("§7"); // 회색
+        gaugeContent.append("§7");
         for (int i = filledSlots; i < totalSlots; i++) {
-            gaugeText.append("░");
+            gaugeContent.append("─");
         }
         
-        // 텍스트 렌더링 (제목과 동일한 방식)
-        String gaugeString = gaugeText.toString();
-        int width = fontRenderer.getStringWidth(gaugeString) / 2;
-        fontRenderer.drawString(gaugeString, -width, 0, 0xFFFFFFFF);
+        String bracketLeft = "§0[";
+        String bracketRight = "§0]";
+        String gaugeContentStr = gaugeContent.toString();
+        
+        int bracketLeftWidth = fontRenderer.getStringWidth(bracketLeft);
+        int gaugeContentWidth = fontRenderer.getStringWidth(gaugeContentStr);
+        int bracketRightWidth = fontRenderer.getStringWidth(bracketRight);
+        int totalWidth = bracketLeftWidth + gaugeContentWidth + bracketRightWidth;
+        
+        int startX = -totalWidth / 2;
+        fontRenderer.drawString(bracketLeft, startX, 0, 0xFFFFFFFF, false);
+        fontRenderer.drawString(bracketRight, startX + bracketLeftWidth + gaugeContentWidth, 0, 0xFFFFFFFF, false);
+        fontRenderer.drawString(gaugeContentStr, startX + bracketLeftWidth, 0, 0xFFFFFFFF, false);
         
         GlStateManager.popMatrix();
+    }
+
+    private void drawTextWithOutline(FontRenderer fontRenderer, String text, int x, int y, int color) {
+        String backgroundChar = "█";
+        int textWidth = fontRenderer.getStringWidth(text);
+        int charWidth = fontRenderer.getStringWidth(backgroundChar);
+        int backgroundWidth = (textWidth / charWidth) + 1;
+        
+        StringBuilder background = new StringBuilder();
+        for (int i = 0; i < backgroundWidth; i++) {
+            background.append(backgroundChar);
+        }
+        fontRenderer.drawString("§0" + background.toString(), x - charWidth / 2, y, 0x40000000, false);
+        fontRenderer.drawString(text, x, y, color, false);
     }
 }

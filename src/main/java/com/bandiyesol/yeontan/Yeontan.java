@@ -22,7 +22,7 @@ public class Yeontan {
 
     public static final String MODID = "yeontan";
     public static final String NAME = "Back To 2020";
-    public static final String VERSION = "2.0";
+    public static final String VERSION = "2.5";
 
     @Mod.Instance
     public static Yeontan instance;
